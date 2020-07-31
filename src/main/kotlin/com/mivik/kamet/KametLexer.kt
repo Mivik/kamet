@@ -26,9 +26,27 @@ internal sealed class KametToken {
 	object Minus : BinaryOperation()
 	object Multiply : BinaryOperation()
 	object Divide : BinaryOperation()
+	object Equal : BinaryOperation()
+	object NotEqual : BinaryOperation()
+	object Less : BinaryOperation()
+	object LessOrEqual : BinaryOperation()
+	object Greater : BinaryOperation()
+	object GreaterOrEqual : BinaryOperation()
+	object ShiftLeft : BinaryOperation()
+	object ShiftRight : BinaryOperation()
+	object And : BinaryOperation()
+	object Or : BinaryOperation()
+	object BitwiseAnd : BinaryOperation()
+	object BitwiseOr : BinaryOperation()
+	object Xor : BinaryOperation()
+
 
 	class Identifier(val name: String) : KametToken() {
 		override fun toString(): String = "Identifier($name)"
+	}
+
+	class BooleanLiteral(val value: Boolean) : KametToken() {
+		override fun toString(): String = "BooleanLiteral($value)"
 	}
 
 	class StringLiteral(val value: String) : KametToken() {
@@ -54,7 +72,7 @@ private enum class KametState : LexerState {
 
 private enum class KametAction : LexerAction {
 	WHITESPACE, NEWLINE, VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT,
-	IDENTIFIER, ASSIGN, INT_LITERAL, LONG_LITERAL, PARENTHESIS, OPERATOR, DOUBLE
+	IDENTIFIER, ASSIGN, INT_LITERAL, LONG_LITERAL, PARENTHESIS, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL
 }
 
 internal class KametLexer(chars: CharSequence) : Lexer<KametToken>(data, chars) {
@@ -65,15 +83,17 @@ internal class KametLexer(chars: CharSequence) : Lexer<KametToken>(data, chars) 
 				"[ \t]+" action KametAction.WHITESPACE
 				"\r|\n|\r\n" action KametAction.NEWLINE
 				"[\\(\\)]" action KametAction.PARENTHESIS
-				"[+\\-*/]" action KametAction.OPERATOR
+				"&&|==|!=|<<|>>|<=|>=|\\|\\|" action KametAction.DOUBLE_CHAR_OPERATOR
+				"[+\\-*/&\\|\\^<>]" action KametAction.SINGLE_CHAR_OPERATOR
 				"val" action KametAction.VAL
 				"var" action KametAction.VAR
+				"true|false" action KametAction.BOOLEAN_LITERAL
 				"[\\w\$_][\\w\\d\$_]*" action KametAction.IDENTIFIER
 				"-?\\d+L" action KametAction.LONG_LITERAL
 				"-?\\d+" action KametAction.INT_LITERAL
 				"=" action KametAction.ASSIGN
 				"\"" action KametAction.ENTER_STRING
-				"(-?(0|[1-9][0-9]*)\\.[0-9]*([eE][+-]?[0-9]*)?)|Infinity|-Infinity|NaN" action KametAction.DOUBLE
+				"(-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+\\-]?[0-9]*)?)|Infinity|-Infinity|NaN" action KametAction.DOUBLE_LITERAL
 			}
 			state(KametState.IN_STRING) {
 				"\\\\u[0-9a-fA-F]{4}" action KametAction.UNICODE_CHAR
@@ -95,19 +115,38 @@ internal class KametLexer(chars: CharSequence) : Lexer<KametToken>(data, chars) 
 			KametAction.NEWLINE -> returnValue(KametToken.Newline)
 			KametAction.IDENTIFIER -> returnValue(KametToken.Identifier(string()))
 			KametAction.PARENTHESIS -> returnValue(if (chars[lastMatch] == '(') KametToken.LeftParenthesis else KametToken.RightParenthesis)
-			KametAction.DOUBLE -> returnValue(KametToken.DoubleLiteral(string().toDouble()))
+			KametAction.DOUBLE_LITERAL -> returnValue(KametToken.DoubleLiteral(string().toDouble()))
 			KametAction.LONG_LITERAL -> returnValue(
 				KametToken.LongLiteral(
 					chars.substring(lastMatch, index - 1).toLong()
 				)
 			)
+			KametAction.BOOLEAN_LITERAL -> returnValue(KametToken.BooleanLiteral(string() == "true"))
 			KametAction.INT_LITERAL -> returnValue(KametToken.IntLiteral(string().toInt()))
-			KametAction.OPERATOR -> returnValue(
+			KametAction.DOUBLE_CHAR_OPERATOR -> returnValue(
+				when (string()) {
+					"==" -> KametToken.Equal
+					"!=" -> KametToken.NotEqual
+					"<=" -> KametToken.LessOrEqual
+					">=" -> KametToken.GreaterOrEqual
+					"<<" -> KametToken.ShiftLeft
+					">>" -> KametToken.ShiftRight
+					"&&" -> KametToken.And
+					"||" -> KametToken.Or
+					else -> unreachable()
+				}
+			)
+			KametAction.SINGLE_CHAR_OPERATOR -> returnValue(
 				when (chars[lastMatch]) {
 					'+' -> KametToken.Plus
 					'-' -> KametToken.Minus
 					'*' -> KametToken.Multiply
 					'/' -> KametToken.Divide
+					'&' -> KametToken.BitwiseAnd
+					'|' -> KametToken.BitwiseOr
+					'^' -> KametToken.Xor
+					'<' -> KametToken.Less
+					'>' -> KametToken.Greater
 					else -> unreachable()
 				}
 			)

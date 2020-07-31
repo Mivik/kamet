@@ -11,18 +11,11 @@ internal class KametLexerTest {
 		val str = """
 			val a = "hello, world!"
 			val b = 233
-			val c = 19260817L
+			val c = -19260817L
 			val d = 1+2*3
 			val e = 1E10+2.5
+			val f = true && (1!=2)
 		""".trimIndent()
-		val time = 5000
-		measureTime {
-			repeat(time) {
-				val lexer = KametLexer(str)
-				while (lexer.lex() != null);
-			}
-		}.also {
-			println(it / time)
-		}
+		println(KametLexer(str).lexAll())
 	}
 }
