@@ -13,7 +13,8 @@ repositories {
 
 dependencies {
 	implementation(kotlin("stdlib-jdk8"))
-	implementation("com.github.KiotLand.kiot-lexer:kiot-lexer:1.0.5.9")
+	implementation("com.github.KiotLand.kiot-lexer:kiot-lexer:1.0.6")
+	implementation("org.bytedeco:llvm-platform:10.0.0-1.5.3")
 	testImplementation(kotlin("test-junit"))
 }
 
