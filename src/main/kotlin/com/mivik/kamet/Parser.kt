@@ -50,10 +50,7 @@ internal class Parser(private val lexer: Lexer) {
 		when (val token = take()) {
 			is Token.Identifier -> ValueNode(context.lookup(token.name))
 			is Token.LeftParenthesis -> takeParenthesisExpr()
-			is Token.BooleanLiteral -> ConstantNode(Type.Primitive.Boolean, token.value)
-			is Token.IntLiteral -> ConstantNode(Type.Primitive.Integer.Int, token.value)
-			is Token.LongLiteral -> ConstantNode(Type.Primitive.Integer.Long, token.value)
-			is Token.DoubleLiteral -> ConstantNode(Type.Primitive.Real.Double, token.value)
+			is Token.Constant -> ConstantNode(token.type, token.literal)
 			else -> unexpected(token)
 		}
 

@@ -26,24 +26,12 @@ internal sealed class Token {
 		override fun toString(): String = "Identifier($name)"
 	}
 
-	class BooleanLiteral(val value: Boolean) : Token() {
-		override fun toString(): String = "BooleanLiteral($value)"
-	}
-
 	class StringLiteral(val value: String) : Token() {
 		override fun toString(): String = "StringLiteral(${value.escape()})"
 	}
 
-	class IntLiteral(val value: Int) : Token() {
-		override fun toString(): String = "IntLiteral($value)"
-	}
-
-	class LongLiteral(val value: Long) : Token() {
-		override fun toString(): String = "LongLiteral($value)"
-	}
-
-	class DoubleLiteral(val value: Double) : Token() {
-		override fun toString(): String = "DoubleLiteral($value)"
+	class Constant(val literal: String, val type: Type.Primitive) : Token() {
+		override fun toString(): String = "Constant($literal, $type)"
 	}
 }
 
@@ -74,7 +62,8 @@ private enum class State : LexerState {
 
 private enum class Action : LexerAction {
 	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT,
-	IDENTIFIER, ASSIGN, INT_LITERAL, LONG_LITERAL, PARENTHESIS, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL
+	IDENTIFIER, ASSIGN, INT_LITERAL, LONG_LITERAL, PARENTHESIS, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
+	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL
 }
 
 internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
@@ -91,6 +80,8 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"var" action Action.VAR
 				"true|false" action Action.BOOLEAN_LITERAL
 				"[\\w\$_][\\w\\d\$_]*" action Action.IDENTIFIER
+				"\\d+UL" action Action.UNSIGNED_LONG_LITERAL
+				"\\d+U" action Action.UNSIGNED_INT_LITERAL
 				"-?\\d+L" action Action.LONG_LITERAL
 				"-?\\d+" action Action.INT_LITERAL
 				"=" action Action.ASSIGN
@@ -117,14 +108,15 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.ASSIGN -> returnValue(Token.Assign)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
 			Action.PARENTHESIS -> returnValue(if (chars[lastMatch] == '(') Token.LeftParenthesis else Token.RightParenthesis)
-			Action.DOUBLE_LITERAL -> returnValue(Token.DoubleLiteral(string().toDouble()))
-			Action.LONG_LITERAL -> returnValue(
-				Token.LongLiteral(
-					chars.substring(lastMatch, index - 1).toLong()
-				)
-			)
-			Action.BOOLEAN_LITERAL -> returnValue(Token.BooleanLiteral(string() == "true"))
-			Action.INT_LITERAL -> returnValue(Token.IntLiteral(string().toInt()))
+			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))
+			Action.UNSIGNED_INT_LITERAL ->
+				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integer.UInt))
+			Action.UNSIGNED_LONG_LITERAL ->
+				returnValue(Token.Constant(chars.substring(lastMatch, index - 2), Type.Primitive.Integer.ULong))
+			Action.INT_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integer.Int))
+			Action.LONG_LITERAL ->
+				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integer.Long))
+			Action.BOOLEAN_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Boolean))
 			Action.DOUBLE_CHAR_OPERATOR -> returnValue(
 				when (string()) {
 					"==" -> BinOp.Equal
