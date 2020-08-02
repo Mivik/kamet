@@ -1,6 +1,7 @@
 package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
+import com.mivik.kamet.ast.AssignNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
@@ -13,6 +14,7 @@ import com.mivik.kamet.ast.TopLevelNode
 import com.mivik.kamet.ast.ValDeclareNode
 import com.mivik.kamet.ast.ValueNode
 import com.mivik.kamet.ast.VarDeclareNode
+import com.mivik.kamet.ast.WhileNode
 import java.util.LinkedList
 
 internal class Parser(private val lexer: Lexer) {
@@ -82,8 +84,14 @@ internal class Parser(private val lexer: Lexer) {
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
 			is Token.Constant -> ConstantNode(token.type, token.literal)
 			is Token.If -> {
-				off(token)
-				takeIf()
+				take().expect<Token.LeftParenthesis>()
+				val condition = takeExpr()
+				take().expect<Token.RightParenthesis>()
+				val thenBlock = takeBlockOrStmt()
+				if (peek() == Token.Else) {
+					take()
+					IfNode(condition, thenBlock, takeBlockOrStmt())
+				} else IfNode(condition, thenBlock)
 			}
 			else -> unexpected(token)
 		}
@@ -99,18 +107,6 @@ internal class Parser(private val lexer: Lexer) {
 			Token.LeftBrace -> takeBlock()
 			else -> takeStmt()
 		}
-
-	fun takeIf(): IfNode {
-		take().expect<Token.If>()
-		take().expect<Token.LeftParenthesis>()
-		val condition = takeExpr()
-		take().expect<Token.RightParenthesis>()
-		val thenBlock = takeBlockOrStmt()
-		return if (peek() == Token.Else) {
-			take()
-			IfNode(condition, thenBlock, takeBlockOrStmt())
-		} else IfNode(condition, thenBlock)
-	}
 
 	fun takeStmt(): ASTNode =
 		when (peek()) {
@@ -131,7 +127,23 @@ internal class Parser(private val lexer: Lexer) {
 				take()
 				ReturnNode(takeExpr())
 			}
-			Token.If -> takeIf()
+			Token.While -> {
+				take()
+				take().expect<Token.LeftParenthesis>()
+				val condition = takeExpr()
+				take().expect<Token.RightParenthesis>()
+				WhileNode(condition, takeBlockOrStmt())
+			}
+			is Token.Identifier -> {
+				val token = take() as Token.Identifier
+				if (peek() == Token.Assign) {
+					take()
+					AssignNode(token.name, takeExpr())
+				} else {
+					off(token)
+					takeExpr()
+				}
+			}
 			else -> takeExpr()
 		}
 

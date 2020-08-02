@@ -1,8 +1,10 @@
 package com.mivik.kamet
 
 import com.mivik.kot.escape
+import org.bytedeco.llvm.LLVM.LLVMBasicBlockRef
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.LLVM.LLVMModuleRef
+import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
 internal class Context(
@@ -24,6 +26,9 @@ internal class Context(
 				Type.defaultTypeMap()
 			)
 	}
+
+	val llvmFunction: LLVMValueRef
+		get() = currentFunction!!.llvm
 
 	fun lookupValueOrNull(name: String): ValueRef? {
 		var current = this
@@ -54,17 +59,22 @@ internal class Context(
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
 		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf())
 
+	@Suppress("NOTHING_TO_INLINE")
+	inline fun setBlock(block: LLVMBasicBlockRef) {
+		LLVM.LLVMPositionBuilderAtEnd(builder, block)
+	}
+
 	fun declareVariable(name: String, value: Value): ValueRef.Var {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
 		val entryBlock = LLVM.LLVMGetEntryBasicBlock(function)
 		val tmpBuilder = LLVM.LLVMCreateBuilder()
-		LLVM.LLVMPositionBuilderBefore(tmpBuilder, LLVM.LLVMGetFirstInstruction(entryBlock))
+		LLVM.LLVMPositionBuilder(tmpBuilder, entryBlock, LLVM.LLVMGetFirstInstruction(entryBlock))
 		val address = LLVM.LLVMBuildAlloca(tmpBuilder, value.type.llvm, name)
 		val ret = ValueRef.Var(address, value.type)
 		LLVM.LLVMSetValueName2(address, name, name.length.toLong())
 		LLVM.LLVMDisposeBuilder(tmpBuilder)
 		declare(name, ret)
-		if (LLVM.LLVMIsUndef(value.llvm)==0) ret.set(this, value)
+		if (LLVM.LLVMIsUndef(value.llvm) == 0) ret.set(this, value)
 		return ret
 	}
 }

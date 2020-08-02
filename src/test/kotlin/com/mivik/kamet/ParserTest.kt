@@ -26,7 +26,11 @@ internal class ParserTest {
 			fun putchar(char: Int): Int
 			
 			fun main(): Int {
-				putchar(if (1==1) 65 else 66)
+				var i = 0
+				while (i<26) {
+					putchar(65+i)
+					i = i+1
+				}
 				return 0
 			}
 		""".trimIndent()

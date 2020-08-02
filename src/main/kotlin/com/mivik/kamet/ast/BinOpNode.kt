@@ -69,8 +69,8 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 			if (op.returnBoolean) Type.Primitive.Boolean
 			else operandType
 		val builder = context.builder
-		val lhsValue = lift(builder, lhs.codegen(context), operandType).llvm
-		val rhsValue = lift(builder, rhs.codegen(context), operandType).llvm
+		val lhsValue = lift(builder, evaluatedLHS, operandType).llvm
+		val rhsValue = lift(builder, evaluatedRHS, operandType).llvm
 		if (operandType == Type.Primitive.Boolean) {
 			return Value(
 				when (op) {
@@ -86,7 +86,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 								BinOp.Greater -> LLVMIntUGT
 								BinOp.GreaterOrEqual -> LLVMIntUGE
 								else -> unreachable()
-							}, lhsValue, rhsValue, "boolean_comparison"
+							}, lhsValue, rhsValue, "boolean_cmp"
 						)
 				}, Type.Primitive.Boolean
 			)
@@ -112,7 +112,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 									if (operandType.signed) LLVMIntSGE
 									else LLVMIntUGE
 								else -> unreachable()
-							}, lhsValue, rhsValue, "integer_comparison"
+							}, lhsValue, rhsValue, "integer_cmp"
 						)
 					}
 					is Type.Primitive.Real -> LLVMBuildFCmp(
@@ -124,7 +124,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 							BinOp.Greater -> LLVMRealOGT
 							BinOp.GreaterOrEqual -> LLVMRealOGE
 							else -> unreachable()
-						}, lhsValue, rhsValue, "real_comparison"
+						}, lhsValue, rhsValue, "real_cmp"
 					)
 					else -> unreachable()
 				}, Type.Primitive.Boolean

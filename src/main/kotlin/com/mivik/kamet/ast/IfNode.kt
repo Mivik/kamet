@@ -8,38 +8,38 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 	override fun codegen(context: Context): Value {
 		val builder = context.builder
 		val conditionValue = condition.codegen(context)
-		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
+		val function = context.llvmFunction
 		val llvmThenBlock = LLVM.LLVMAppendBasicBlock(function, "then")
 		val llvmElseBlock = LLVM.LLVMAppendBasicBlock(function, "else")
 		if (elseBlock == null) {
 			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, llvmThenBlock, llvmElseBlock)
-			LLVM.LLVMPositionBuilderAtEnd(builder, llvmThenBlock)
+			context.setBlock(llvmThenBlock)
 			LLVM.LLVMBuildBr(builder, llvmElseBlock)
-			LLVM.LLVMPositionBuilderAtEnd(builder, llvmElseBlock)
+			context.setBlock(llvmElseBlock)
 			return Value.Nothing
 		} else {
 			val llvmFinalBlock = LLVM.LLVMAppendBasicBlock(function, "final")
 			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, llvmThenBlock, llvmElseBlock)
-			LLVM.LLVMPositionBuilderAtEnd(builder, llvmThenBlock)
+			context.setBlock(llvmThenBlock)
 			val thenRet = thenBlock.codegen(context)
-			LLVM.LLVMPositionBuilderAtEnd(builder, llvmElseBlock)
+			context.setBlock(llvmElseBlock)
 			val elseRet = elseBlock.codegen(context)
 			return if (thenRet.type == elseRet.type) {
 				val variable = context.declareVariable("if_result", thenRet.type.undefined())
-				LLVM.LLVMPositionBuilderAtEnd(builder, llvmThenBlock)
+				context.setBlock(llvmThenBlock)
 				variable.set(context, thenRet)
 				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				LLVM.LLVMPositionBuilderAtEnd(builder, llvmElseBlock)
+				context.setBlock(llvmElseBlock)
 				variable.set(context, elseRet)
 				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				LLVM.LLVMPositionBuilderAtEnd(builder, llvmFinalBlock)
+				context.setBlock(llvmFinalBlock)
 				variable.get(context)
 			} else {
-				LLVM.LLVMPositionBuilderAtEnd(builder, llvmThenBlock)
+				context.setBlock(llvmThenBlock)
 				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				LLVM.LLVMPositionBuilderAtEnd(builder, llvmElseBlock)
+				context.setBlock(llvmElseBlock)
 				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				LLVM.LLVMPositionBuilderAtEnd(builder, llvmFinalBlock)
+				context.setBlock(llvmFinalBlock)
 				Value.Nothing
 			}
 		}
