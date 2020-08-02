@@ -21,6 +21,12 @@ internal sealed class Token {
 	object Assign : Token()
 	object LeftParenthesis : Token()
 	object RightParenthesis : Token()
+	object LeftBrace : Token()
+	object RightBrace : Token()
+	object Colon : Token()
+	object Comma : Token()
+	object Function : Token()
+	object Return: Token()
 
 	class Identifier(val name: String) : Token() {
 		override fun toString(): String = "Identifier($name)"
@@ -62,8 +68,8 @@ private enum class State : LexerState {
 
 private enum class Action : LexerAction {
 	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT,
-	IDENTIFIER, ASSIGN, INT_LITERAL, LONG_LITERAL, PARENTHESIS, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
-	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL
+	IDENTIFIER, ASSIGN, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
+	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN
 }
 
 internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
@@ -73,11 +79,12 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			state(default) {
 				"[ \t]+".ignore()
 				"\r|\n|\r\n".ignore()
-				"[\\(\\)]" action Action.PARENTHESIS
 				"&&|==|!=|<<|>>|<=|>=|\\|\\|" action Action.DOUBLE_CHAR_OPERATOR
-				"[+\\-*/&\\|\\^<>%]" action Action.SINGLE_CHAR_OPERATOR
+				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,]" action Action.SINGLE_CHAR_OPERATOR
 				"val" action Action.VAL
 				"var" action Action.VAR
+				"fun" action Action.FUNCTION
+				"return" action Action.RETURN
 				"true|false" action Action.BOOLEAN_LITERAL
 				"[\\w\$_][\\w\\d\$_]*" action Action.IDENTIFIER
 				"\\d+UL" action Action.UNSIGNED_LONG_LITERAL
@@ -105,9 +112,10 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 		when (Action.values()[action - 1]) {
 			Action.VAL -> returnValue(Token.Val)
 			Action.VAR -> returnValue(Token.Var)
+			Action.FUNCTION -> returnValue(Token.Function)
+			Action.RETURN -> returnValue(Token.Return)
 			Action.ASSIGN -> returnValue(Token.Assign)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
-			Action.PARENTHESIS -> returnValue(if (chars[lastMatch] == '(') Token.LeftParenthesis else Token.RightParenthesis)
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))
 			Action.UNSIGNED_INT_LITERAL ->
 				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integer.UInt))
@@ -142,6 +150,12 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					'<' -> BinOp.Less
 					'>' -> BinOp.Greater
 					'%' -> BinOp.Reminder
+					'{' -> Token.LeftBrace
+					'}' -> Token.RightBrace
+					'(' -> Token.LeftParenthesis
+					')' -> Token.RightParenthesis
+					':' -> Token.Colon
+					',' -> Token.Comma
 					else -> unreachable()
 				}
 			)

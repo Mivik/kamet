@@ -3,7 +3,32 @@ package com.mivik.kamet
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.global.LLVM
 
-sealed class Type(val superType: Type? = Any) {
+sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? = Any) {
+	companion object {
+		val defaultTypes = arrayOf(
+			Any,
+			Nothing,
+			Unit,
+			Primitive.Boolean,
+			Primitive.Integer.Char,
+			Primitive.Integer.Byte,
+			Primitive.Integer.UByte,
+			Primitive.Integer.Short,
+			Primitive.Integer.UShort,
+			Primitive.Integer.Int,
+			Primitive.Integer.UInt,
+			Primitive.Integer.Long,
+			Primitive.Integer.ULong,
+			Primitive.Real.Float,
+			Primitive.Real.Double
+		)
+
+		fun defaultTypeMap(): MutableMap<String, Type> =
+			mutableMapOf<String, Type>().apply {
+				for (type in defaultTypes) this[type.name] = type
+			}
+	}
+
 	abstract val sizeInBits: Int // TODO this is not always int!
 
 	override fun toString(): String = javaClass.simpleName
@@ -17,45 +42,45 @@ sealed class Type(val superType: Type? = Any) {
 
 	fun isSuperTypeOf(other: Type): Boolean = other.isSubtypeOf(this)
 
-	object Any : Type(null) {
+	object Any : Type("Any", LLVM.LLVMVoidType(), null) {
 		override val sizeInBits: Int
 			get() = 0
 	}
 
-	object Nothing : Type(null) {
+	object Nothing : Type("Nothing", LLVM.LLVMVoidType(), null) {
 		override val sizeInBits: Int
 			get() = 0
 
 		override fun isSubtypeOf(other: Type): Boolean = true
 	}
 
-	object Unit : Type(null) {
+	object Unit : Type("Unit", LLVM.LLVMVoidType(), null) {
 		override val sizeInBits: Int
 			get() = 0
 
-		override fun isSubtypeOf(other: Type): Boolean = false
+		override fun isSubtypeOf(other: Type): Boolean = other == Unit
 	}
 
-	sealed class Primitive(override val sizeInBits: Int, val llvm: LLVMTypeRef) : Type() {
-		object Boolean : Primitive(1, LLVM.LLVMIntType(1))
+	sealed class Primitive(name: String, override val sizeInBits: Int, llvm: LLVMTypeRef) : Type(name, llvm) {
+		object Boolean : Primitive("Boolean", 1, LLVM.LLVMIntType(1))
 
-		sealed class Integer(sizeInBits: kotlin.Int, val signed: kotlin.Boolean) :
-			Primitive(sizeInBits, LLVM.LLVMIntType(sizeInBits)) {
-			object Char : Integer(16, true)
+		sealed class Integer(name: String, sizeInBits: kotlin.Int, val signed: kotlin.Boolean) :
+			Primitive(name, sizeInBits, LLVM.LLVMIntType(sizeInBits)) {
+			object Char : Integer("Char", 16, true)
 
-			object Byte : Integer(8, true)
-			object UByte : Integer(8, false)
-			object Short : Integer(16, true)
-			object UShort : Integer(16, false)
-			object Int : Integer(32, true)
-			object UInt : Integer(32, false)
-			object Long : Integer(64, true)
-			object ULong : Integer(64, false)
+			object Byte : Integer("Byte", 8, true)
+			object UByte : Integer("UByte", 8, false)
+			object Short : Integer("Short", 16, true)
+			object UShort : Integer("UShort", 16, false)
+			object Int : Integer("Int", 32, true)
+			object UInt : Integer("UInt", 32, false)
+			object Long : Integer("Long", 64, true)
+			object ULong : Integer("ULong", 64, false)
 		}
 
-		sealed class Real(sizeInBits: Int, llvm: LLVMTypeRef) : Primitive(sizeInBits, llvm) {
-			object Float : Real(32, LLVM.LLVMFloatType())
-			object Double : Real(64, LLVM.LLVMDoubleType())
+		sealed class Real(name: String, sizeInBits: Int, llvm: LLVMTypeRef) : Primitive(name, sizeInBits, llvm) {
+			object Float : Real("Float", 32, LLVM.LLVMFloatType())
+			object Double : Real("Double", 64, LLVM.LLVMDoubleType())
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.BinOp
+import com.mivik.kamet.Context
 import com.mivik.kamet.IllegalCastException
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
@@ -8,10 +9,10 @@ import com.mivik.kamet.unreachable
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.global.LLVM
 
-internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : ExprNode() {
-	private val operandType: Type = run {
-		val lhsType = lhs.type
-		val rhsType = rhs.type
+internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : ExprNode {
+	private fun getOperandType(lhsValue: Value, rhsValue: Value): Type = run {
+		val lhsType = lhsValue.type
+		val rhsType = rhsValue.type
 		if (lhsType !is Type.Primitive || rhsType !is Type.Primitive) TODO()
 		else if (lhsType == Type.Primitive.Real.Double || rhsType == Type.Primitive.Real.Double) Type.Primitive.Real.Double
 		else if (lhsType == Type.Primitive.Real.Float || rhsType == Type.Primitive.Real.Float) Type.Primitive.Real.Float
@@ -26,11 +27,6 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 			} else rhsType
 		}
 	}
-
-	override val type: Type
-		get() =
-			if (op.returnBoolean) Type.Primitive.Boolean
-			else operandType
 
 	private fun lift(builder: LLVMBuilderRef, value: Value, type: Type): Value {
 		if (value.type == type) return value
@@ -65,10 +61,16 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 		)
 	}
 
-	override fun codegen(builder: LLVMBuilderRef): Value {
-		val type = this.type
-		val lhsValue = lift(builder, lhs.codegen(builder), operandType).llvm
-		val rhsValue = lift(builder, rhs.codegen(builder), operandType).llvm
+	override fun codegen(context: Context): Value {
+		val evaluatedLHS = lhs.codegen(context)
+		val evaluatedRHS = rhs.codegen(context)
+		val operandType = getOperandType(evaluatedLHS, evaluatedRHS)
+		val type =
+			if (op.returnBoolean) Type.Primitive.Boolean
+			else operandType
+		val builder = context.builder
+		val lhsValue = lift(builder, lhs.codegen(context), operandType).llvm
+		val rhsValue = lift(builder, rhs.codegen(context), operandType).llvm
 		if (operandType == Type.Primitive.Boolean) {
 			return Value(
 				when (op) {
@@ -124,7 +126,7 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 							else -> unreachable()
 						}, lhsValue, rhsValue, "real_comparison"
 					)
-					else -> TODO()
+					else -> unreachable()
 				}, Type.Primitive.Boolean
 			)
 		else Value(
