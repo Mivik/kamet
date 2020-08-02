@@ -6,7 +6,7 @@ import com.mivik.kamet.Value
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.global.LLVM
 
-internal class ConstantNode(val type: Type.Primitive, val value: String) : ExprNode {
+internal class ConstantNode(val type: Type.Primitive, val value: String) : ASTNode {
 	override fun codegen(context: Context): Value =
 		Value(
 			when (type) {

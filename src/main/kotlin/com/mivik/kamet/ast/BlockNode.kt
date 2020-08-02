@@ -3,11 +3,12 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 
-internal class BlockNode : StmtNode, ExprNode {
-	val elements: MutableList<StmtNode> = mutableListOf()
+internal class BlockNode : ASTNode {
+	val elements: MutableList<ASTNode> = mutableListOf()
 
 	override fun codegen(context: Context): Value {
-		for (element in elements) element.codegen(context)
-		return Value.Null
+		if (elements.isEmpty()) return Value.Unit
+		for (i in 0 until elements.lastIndex) elements[i].codegen(context)
+		return elements.last().codegen(context)
 	}
 }

@@ -9,7 +9,7 @@ internal class Context(
 	val parent: Context?,
 	val module: LLVMModuleRef,
 	val builder: LLVMBuilderRef,
-	var result: Value?,
+	val currentFunction: Value?,
 	private val valueMap: MutableMap<String, ValueRef>,
 	private val typeMap: MutableMap<String, Type>
 ) {
@@ -51,6 +51,20 @@ internal class Context(
 		valueMap[name] = valueRef
 	}
 
-	fun subContext(): Context =
-		Context(this, module, builder, null, mutableMapOf(), mutableMapOf())
+	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
+		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf())
+
+	fun declareVariable(name: String, value: Value): ValueRef.Var {
+		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
+		val entryBlock = LLVM.LLVMGetEntryBasicBlock(function)
+		val tmpBuilder = LLVM.LLVMCreateBuilder()
+		LLVM.LLVMPositionBuilderBefore(tmpBuilder, LLVM.LLVMGetFirstInstruction(entryBlock))
+		val address = LLVM.LLVMBuildAlloca(tmpBuilder, value.type.llvm, name)
+		val ret = ValueRef.Var(address, value.type)
+		LLVM.LLVMSetValueName2(address, name, name.length.toLong())
+		LLVM.LLVMDisposeBuilder(tmpBuilder)
+		declare(name, ret)
+		if (LLVM.LLVMIsUndef(value.llvm)==0) ret.set(this, value)
+		return ret
+	}
 }

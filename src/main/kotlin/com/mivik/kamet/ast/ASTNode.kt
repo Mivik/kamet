@@ -4,9 +4,5 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 
 internal interface ASTNode {
-	fun codegen(context: Context): Value = Value.Null
+	fun codegen(context: Context): Value = Value.Nothing
 }
-
-internal interface StmtNode : ASTNode
-
-internal interface ExprNode : ASTNode, StmtNode

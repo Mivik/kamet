@@ -43,19 +43,21 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? 
 
 	fun isSuperTypeOf(other: Type): Boolean = other.isSubtypeOf(this)
 
+	fun undefined(): Value = Value(LLVM.LLVMGetUndef(llvm), this)
+
 	object Any : Type("Any", LLVM.LLVMVoidType(), null) {
 		override val sizeInBits: Int
 			get() = 0
 	}
 
-	object Nothing : Type("Nothing", LLVM.LLVMVoidType(), null) {
+	object Nothing : Type("Nothing", LLVM.LLVMVoidType()) {
 		override val sizeInBits: Int
 			get() = 0
 
 		override fun isSubtypeOf(other: Type): Boolean = true
 	}
 
-	object Unit : Type("Unit", LLVM.LLVMVoidType(), null) {
+	object Unit : Type("Unit", LLVM.LLVMVoidType()) {
 		override val sizeInBits: Int
 			get() = 0
 
@@ -78,6 +80,16 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? 
 	) {
 		override val sizeInBits: Int
 			get() = error("Attempt to get the size of a function")
+
+		override fun equals(other: kotlin.Any?): Boolean =
+			if (other is Function) returnType == other.returnType && parameterTypes == other.parameterTypes
+			else false
+
+		override fun hashCode(): Int {
+			var result = returnType.hashCode()
+			result = 31 * result + parameterTypes.hashCode()
+			return result
+		}
 	}
 
 	sealed class Primitive(name: String, override val sizeInBits: Int, llvm: LLVMTypeRef) : Type(name, llvm) {

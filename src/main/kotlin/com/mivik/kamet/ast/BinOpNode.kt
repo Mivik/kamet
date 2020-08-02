@@ -7,9 +7,9 @@ import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.unreachable
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
-import org.bytedeco.llvm.global.LLVM
+import org.bytedeco.llvm.global.LLVM.*
 
-internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : ExprNode {
+internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : ASTNode {
 	private fun getOperandType(lhsValue: Value, rhsValue: Value): Type = run {
 		val lhsType = lhsValue.type
 		val rhsType = rhsValue.type
@@ -36,11 +36,11 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 				is Type.Primitive.Integer -> {
 					when (value.type) {
 						is Type.Primitive.Integer ->
-							if (type.signed) LLVM.LLVMBuildSExt(builder, value.llvm, type.llvm, "signed_ext")
-							else LLVM.LLVMBuildZExt(builder, value.llvm, type.llvm, "unsigned_ext")
+							if (type.signed) LLVMBuildSExt(builder, value.llvm, type.llvm, "signed_ext")
+							else LLVMBuildZExt(builder, value.llvm, type.llvm, "unsigned_ext")
 						is Type.Primitive.Real ->
-							if (type.signed) LLVM.LLVMBuildFPToSI(builder, value.llvm, type.llvm, "real_to_signed")
-							else LLVM.LLVMBuildFPToUI(builder, value.llvm, type.llvm, "real_to_unsigned")
+							if (type.signed) LLVMBuildFPToSI(builder, value.llvm, type.llvm, "real_to_signed")
+							else LLVMBuildFPToUI(builder, value.llvm, type.llvm, "real_to_unsigned")
 						else -> throw IllegalCastException(value.type, type)
 					}
 				}
@@ -48,11 +48,11 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 					when (value.type) {
 						is Type.Primitive.Integer ->
 							if (value.type.signed)
-								LLVM.LLVMBuildSIToFP(builder, value.llvm, type.llvm, "signed_to_real")
+								LLVMBuildSIToFP(builder, value.llvm, type.llvm, "signed_to_real")
 							else
-								LLVM.LLVMBuildUIToFP(builder, value.llvm, type.llvm, "unsigned_to_real")
+								LLVMBuildUIToFP(builder, value.llvm, type.llvm, "unsigned_to_real")
 						is Type.Primitive.Real ->
-							LLVM.LLVMBuildFPExt(builder, value.llvm, type.llvm, "real_ext")
+							LLVMBuildFPExt(builder, value.llvm, type.llvm, "real_ext")
 						else -> throw IllegalCastException(value.type, type)
 					}
 				}
@@ -74,17 +74,17 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 		if (operandType == Type.Primitive.Boolean) {
 			return Value(
 				when (op) {
-					BinOp.And -> LLVM.LLVMBuildAnd(builder, lhsValue, rhsValue, "and")
-					BinOp.Or -> LLVM.LLVMBuildOr(builder, lhsValue, rhsValue, "or")
+					BinOp.And -> LLVMBuildAnd(builder, lhsValue, rhsValue, "and")
+					BinOp.Or -> LLVMBuildOr(builder, lhsValue, rhsValue, "or")
 					else ->
-						LLVM.LLVMBuildICmp(
+						LLVMBuildICmp(
 							builder, when (op) {
-								BinOp.Equal -> LLVM.LLVMIntEQ
-								BinOp.NotEqual -> LLVM.LLVMIntNE
-								BinOp.Less -> LLVM.LLVMIntULT
-								BinOp.LessOrEqual -> LLVM.LLVMIntULE
-								BinOp.Greater -> LLVM.LLVMIntUGT
-								BinOp.GreaterOrEqual -> LLVM.LLVMIntUGE
+								BinOp.Equal -> LLVMIntEQ
+								BinOp.NotEqual -> LLVMIntNE
+								BinOp.Less -> LLVMIntULT
+								BinOp.LessOrEqual -> LLVMIntULE
+								BinOp.Greater -> LLVMIntUGT
+								BinOp.GreaterOrEqual -> LLVMIntUGE
 								else -> unreachable()
 							}, lhsValue, rhsValue, "boolean_comparison"
 						)
@@ -95,34 +95,34 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 			Value(
 				when (operandType) {
 					is Type.Primitive.Integer -> {
-						LLVM.LLVMBuildICmp(
+						LLVMBuildICmp(
 							builder, when (op) {
-								BinOp.Equal -> LLVM.LLVMIntEQ
-								BinOp.NotEqual -> LLVM.LLVMIntNE
+								BinOp.Equal -> LLVMIntEQ
+								BinOp.NotEqual -> LLVMIntNE
 								BinOp.Less ->
-									if (operandType.signed) LLVM.LLVMIntSLT
-									else LLVM.LLVMIntULT
+									if (operandType.signed) LLVMIntSLT
+									else LLVMIntULT
 								BinOp.LessOrEqual ->
-									if (operandType.signed) LLVM.LLVMIntSLE
-									else LLVM.LLVMIntULE
+									if (operandType.signed) LLVMIntSLE
+									else LLVMIntULE
 								BinOp.Greater ->
-									if (operandType.signed) LLVM.LLVMIntSGT
-									else LLVM.LLVMIntUGT
+									if (operandType.signed) LLVMIntSGT
+									else LLVMIntUGT
 								BinOp.GreaterOrEqual ->
-									if (operandType.signed) LLVM.LLVMIntSGE
-									else LLVM.LLVMIntUGE
+									if (operandType.signed) LLVMIntSGE
+									else LLVMIntUGE
 								else -> unreachable()
 							}, lhsValue, rhsValue, "integer_comparison"
 						)
 					}
-					is Type.Primitive.Real -> LLVM.LLVMBuildFCmp(
+					is Type.Primitive.Real -> LLVMBuildFCmp(
 						builder, when (op) {
-							BinOp.Equal -> LLVM.LLVMRealOEQ
-							BinOp.NotEqual -> LLVM.LLVMRealONE
-							BinOp.Less -> LLVM.LLVMRealOLT
-							BinOp.LessOrEqual -> LLVM.LLVMRealOLE
-							BinOp.Greater -> LLVM.LLVMRealOGT
-							BinOp.GreaterOrEqual -> LLVM.LLVMRealOGE
+							BinOp.Equal -> LLVMRealOEQ
+							BinOp.NotEqual -> LLVMRealONE
+							BinOp.Less -> LLVMRealOLT
+							BinOp.LessOrEqual -> LLVMRealOLE
+							BinOp.Greater -> LLVMRealOGT
+							BinOp.GreaterOrEqual -> LLVMRealOGE
 							else -> unreachable()
 						}, lhsValue, rhsValue, "real_comparison"
 					)
@@ -132,35 +132,38 @@ internal class BinOpNode(val lhs: ExprNode, val rhs: ExprNode, val op: BinOp) : 
 		else Value(
 			when (type) {
 				is Type.Primitive.Integer ->
-					when (op) {
-						BinOp.Plus -> LLVM.LLVMBuildAdd(builder, lhsValue, rhsValue, "plus")
-						BinOp.Minus -> LLVM.LLVMBuildSub(builder, lhsValue, rhsValue, "minus")
-						BinOp.Multiply -> LLVM.LLVMBuildMul(builder, lhsValue, rhsValue, "multiply")
-						BinOp.Divide ->
-							if (type.signed) LLVM.LLVMBuildSDiv(builder, lhsValue, rhsValue, "signed_divide")
-							else LLVM.LLVMBuildUDiv(builder, lhsValue, rhsValue, "unsigned_divide")
-						BinOp.Reminder ->
-							if (type.signed) LLVM.LLVMBuildSRem(builder, lhsValue, rhsValue, "signed_reminder")
-							else LLVM.LLVMBuildURem(builder, lhsValue, rhsValue, "unsigned_reminder")
-						BinOp.ShiftLeft -> LLVM.LLVMBuildShl(builder, lhsValue, rhsValue, "shift_left")
-						BinOp.ShiftRight ->
-							if (type.signed) LLVM.LLVMBuildAShr(builder, lhsValue, rhsValue, "signed_shift_right")
-							else LLVM.LLVMBuildLShr(builder, lhsValue, rhsValue, "unsigned_shift_right")
-						BinOp.BitwiseAnd -> LLVM.LLVMBuildAnd(builder, lhsValue, rhsValue, "bitwise_and")
-						BinOp.BitwiseOr -> LLVM.LLVMBuildOr(builder, lhsValue, rhsValue, "bitwise_or")
-						BinOp.Xor -> LLVM.LLVMBuildXor(builder, lhsValue, rhsValue, "xor")
-						else -> unreachable()
-					}
+					LLVMBuildBinOp(
+						builder, when (op) {
+							BinOp.Plus -> LLVMAdd
+							BinOp.Minus -> LLVMSub
+							BinOp.Multiply -> LLVMMul
+							BinOp.Divide ->
+								if (type.signed) LLVMSDiv
+								else LLVMUDiv
+							BinOp.Reminder ->
+								if (type.signed) LLVMSRem
+								else LLVMURem
+							BinOp.ShiftLeft -> LLVMShl
+							BinOp.ShiftRight ->
+								if (type.signed) LLVMAShr
+								else LLVMLShr
+							BinOp.BitwiseAnd -> LLVMAnd
+							BinOp.BitwiseOr -> LLVMOr
+							BinOp.Xor -> LLVMXor
+							else -> unreachable()
+						}, lhsValue, rhsValue, "integer_binop"
+					)
 				is Type.Primitive.Real ->
-					when (op) {
-						BinOp.Plus -> LLVM.LLVMBuildFAdd(builder, lhsValue, rhsValue, "plus")
-						BinOp.Minus -> LLVM.LLVMBuildFSub(builder, lhsValue, rhsValue, "minus")
-						BinOp.Multiply -> LLVM.LLVMBuildFMul(builder, lhsValue, rhsValue, "multiply")
-						BinOp.Divide ->
-							LLVM.LLVMBuildFDiv(builder, lhsValue, rhsValue, "signed_divide")
-						BinOp.Reminder -> LLVM.LLVMBuildFRem(builder, lhsValue, rhsValue, "signed_reminder")
-						else -> unreachable()
-					}
+					LLVMBuildBinOp(
+						builder, when (op) {
+							BinOp.Plus -> LLVMFAdd
+							BinOp.Minus -> LLVMFSub
+							BinOp.Multiply -> LLVMFMul
+							BinOp.Divide -> LLVMFDiv
+							BinOp.Reminder -> LLVMFRem
+							else -> unreachable()
+						}, lhsValue, rhsValue, "real_binop"
+					)
 				else -> unreachable()
 			}, type
 		)

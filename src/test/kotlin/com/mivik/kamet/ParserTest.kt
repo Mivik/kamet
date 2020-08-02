@@ -26,7 +26,7 @@ internal class ParserTest {
 			fun putchar(char: Int): Int
 			
 			fun main(): Int {
-				putchar(putchar(113))
+				putchar(if (1==1) 65 else 66)
 				return 0
 			}
 		""".trimIndent()

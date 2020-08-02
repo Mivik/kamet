@@ -2,14 +2,13 @@ package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.ConstantNode
-import com.mivik.kamet.ast.ExprNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
 import com.mivik.kamet.ast.FunctionNode
+import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.InvocationNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
-import com.mivik.kamet.ast.StmtNode
 import com.mivik.kamet.ast.TopLevelNode
 import com.mivik.kamet.ast.ValDeclareNode
 import com.mivik.kamet.ast.ValueNode
@@ -29,6 +28,11 @@ internal class Parser(private val lexer: Lexer) {
 		if (readBuffer.isEmpty()) lexer.lex().also { readBuffer.push(it) }
 		else readBuffer.peek()
 
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun off(token: Token) {
+		readBuffer.offerFirst(token)
+	}
+
 	private inline fun <reified T> Token?.expect(): Token {
 		require(this is T) { "Expected ${T::class.simpleName}, got $this" }
 		return this
@@ -41,7 +45,7 @@ internal class Parser(private val lexer: Lexer) {
 		else -1
 
 	// TODO Use stack to implement this.
-	private fun takeBinOp(precedence: Int, lhs: ExprNode): ExprNode {
+	private fun takeBinOp(precedence: Int, lhs: ASTNode): ASTNode {
 		var currentLHS = lhs
 		while (true) {
 			val current = peek()
@@ -56,13 +60,13 @@ internal class Parser(private val lexer: Lexer) {
 		}
 	}
 
-	private fun takePrimary(): ExprNode =
+	private fun takePrimary(): ASTNode =
 		when (val token = take()) {
 			is Token.Identifier ->
 				if (peek() == Token.LeftParenthesis) {
 					take()
 					if (peek() != Token.RightParenthesis) {
-						val list = mutableListOf<ExprNode>()
+						val list = mutableListOf<ASTNode>()
 						while (true) {
 							list += takeExpr()
 							val splitter = take()
@@ -77,15 +81,38 @@ internal class Parser(private val lexer: Lexer) {
 				} else ValueNode(token.name)
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
 			is Token.Constant -> ConstantNode(token.type, token.literal)
+			is Token.If -> {
+				off(token)
+				takeIf()
+			}
 			else -> unexpected(token)
 		}
 
-	fun takeExpr(): ExprNode {
+	fun takeExpr(): ASTNode {
 		val lhs = takePrimary()
 		return takeBinOp(-1, lhs)
 	}
 
-	fun takeStmt(): StmtNode =
+	@Suppress("NOTHING_TO_INLINE")
+	inline fun takeBlockOrStmt(): ASTNode =
+		when (peek()) {
+			Token.LeftBrace -> takeBlock()
+			else -> takeStmt()
+		}
+
+	fun takeIf(): IfNode {
+		take().expect<Token.If>()
+		take().expect<Token.LeftParenthesis>()
+		val condition = takeExpr()
+		take().expect<Token.RightParenthesis>()
+		val thenBlock = takeBlockOrStmt()
+		return if (peek() == Token.Else) {
+			take()
+			IfNode(condition, thenBlock, takeBlockOrStmt())
+		} else IfNode(condition, thenBlock)
+	}
+
+	fun takeStmt(): ASTNode =
 		when (peek()) {
 			Token.Val -> {
 				take()
@@ -104,6 +131,7 @@ internal class Parser(private val lexer: Lexer) {
 				take()
 				ReturnNode(takeExpr())
 			}
+			Token.If -> takeIf()
 			else -> takeExpr()
 		}
 

@@ -6,7 +6,7 @@ import com.mivik.kamet.Value
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.global.LLVM
 
-internal class InvocationNode(val functionName: String, val elements: List<ExprNode>) : ExprNode {
+internal class InvocationNode(val functionName: String, val elements: List<ASTNode>) : ASTNode {
 	override fun codegen(context: Context): Value {
 		// TODO polymorphism
 		val function = context.lookupValue(functionName).get(context)
