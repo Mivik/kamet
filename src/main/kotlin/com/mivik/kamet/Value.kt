@@ -5,6 +5,6 @@ import org.bytedeco.llvm.global.LLVM
 
 class Value(val llvm: LLVMValueRef, val type: Type) {
 	companion object {
-		val Empty = Value(LLVM.LLVMConstNull(LLVM.LLVMVoidType().pointer()), Type.Unit)
+		val Null = Value(LLVM.LLVMConstNull(LLVM.LLVMVoidType().pointer()), Type.Unit)
 	}
 }

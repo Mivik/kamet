@@ -10,7 +10,6 @@ internal class Context(
 	val module: LLVMModuleRef,
 	val builder: LLVMBuilderRef,
 	var result: Value?,
-	private val implementedFunctions: MutableSet<String>,
 	private val valueMap: MutableMap<String, ValueRef>,
 	private val typeMap: MutableMap<String, Type>
 ) {
@@ -21,7 +20,6 @@ internal class Context(
 				LLVM.LLVMModuleCreateWithName(moduleName),
 				LLVM.LLVMCreateBuilder(),
 				null,
-				mutableSetOf(),
 				mutableMapOf(),
 				Type.defaultTypeMap()
 			)
@@ -37,6 +35,8 @@ internal class Context(
 
 	fun lookupValue(name: String): ValueRef = lookupValueOrNull(name) ?: error("Unknown identifier ${name.escape()}")
 
+	fun hasValue(name: String): Boolean = valueMap.containsKey(name)
+
 	fun lookupTypeOrNull(name: String): Type? {
 		var current = this
 		while (true) {
@@ -51,10 +51,6 @@ internal class Context(
 		valueMap[name] = valueRef
 	}
 
-	fun functionImplemented(name: String) = name in implementedFunctions
-	fun implementFunction(name: String) {
-		implementedFunctions += name
-	}
-
-	fun subContext(): Context = Context(this, module, builder, null, implementedFunctions, mutableMapOf(), mutableMapOf())
+	fun subContext(): Context =
+		Context(this, module, builder, null, mutableMapOf(), mutableMapOf())
 }

@@ -4,6 +4,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
+import com.mivik.kamet.asVal
 import org.bytedeco.llvm.global.LLVM
 
 internal class FunctionNode(
@@ -11,17 +12,16 @@ internal class FunctionNode(
 	val body: BlockNode
 ) : ASTNode {
 	override fun codegen(context: Context): Value {
-		if (context.functionImplemented(prototype.name)) error("Function ${prototype.name} redeclared")
-		context.implementFunction(prototype.name)
-		prototype.codegen(context)
-		val function = LLVM.LLVMGetNamedFunction(context.module, prototype.name)
-		LLVM.LLVMPositionBuilderAtEnd(context.builder, LLVM.LLVMAppendBasicBlock(function, "entry"))
+		if (context.hasValue(prototype.name)) error("Redeclare of ${prototype.name}")
+		val function = prototype.codegen(context)
+		LLVM.LLVMGetNamedFunction(context.module, prototype.name)
+		LLVM.LLVMPositionBuilderAtEnd(context.builder, LLVM.LLVMAppendBasicBlock(function.llvm, "entry"))
 		val subContext = context.subContext()
 		val parameters = prototype.parameters
 		for (i in parameters.indices)
 			subContext.declare(
 				parameters[i].first,
-				ValueRef.Val(Value(LLVM.LLVMGetParam(function, i), context.lookupType(parameters[i].second)))
+				Value(LLVM.LLVMGetParam(function.llvm, i), context.lookupType(parameters[i].second)).asVal()
 			)
 		body.codegen(subContext)
 		val result = subContext.result
@@ -33,6 +33,7 @@ internal class FunctionNode(
 			if (it == null) LLVM.LLVMBuildRetVoid(context.builder)
 			else LLVM.LLVMBuildRet(context.builder, it.llvm)
 		}
-		return Value.Empty
+		context.declare(prototype.name, function.asVal())
+		return function
 	}
 }

@@ -32,3 +32,5 @@ sealed class ValueRef {
 		}
 	}
 }
+
+fun Value.asVal(): ValueRef.Val = ValueRef.Val(this)

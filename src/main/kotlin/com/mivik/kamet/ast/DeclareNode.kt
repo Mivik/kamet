@@ -3,14 +3,15 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
+import com.mivik.kamet.asVal
 import org.bytedeco.llvm.global.LLVM
 
 internal class ValDeclareNode(val name: String, val defaultValue: ExprNode) : StmtNode {
 	override fun codegen(context: Context): Value {
 		val value = defaultValue.codegen(context)
-		context.declare(name, ValueRef.Val(value))
+		context.declare(name, value.asVal())
 		LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
-		return Value.Empty
+		return Value.Null
 	}
 }
 
@@ -27,6 +28,6 @@ internal class VarDeclareNode(val name: String, val defaultValue: ExprNode) : St
 		LLVM.LLVMDisposeBuilder(tmpBuilder)
 		context.declare(name, ref)
 		ref.set(context, value)
-		return Value.Empty
+		return Value.Null
 	}
 }

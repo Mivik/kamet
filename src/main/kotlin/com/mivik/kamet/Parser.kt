@@ -1,13 +1,16 @@
 package com.mivik.kamet
 
+import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.ExprNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
 import com.mivik.kamet.ast.FunctionNode
+import com.mivik.kamet.ast.InvocationNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
 import com.mivik.kamet.ast.StmtNode
+import com.mivik.kamet.ast.TopLevelNode
 import com.mivik.kamet.ast.ValDeclareNode
 import com.mivik.kamet.ast.ValueNode
 import com.mivik.kamet.ast.VarDeclareNode
@@ -55,7 +58,23 @@ internal class Parser(private val lexer: Lexer) {
 
 	private fun takePrimary(): ExprNode =
 		when (val token = take()) {
-			is Token.Identifier -> ValueNode(token.name)
+			is Token.Identifier ->
+				if (peek() == Token.LeftParenthesis) {
+					take()
+					if (peek() != Token.RightParenthesis) {
+						val list = mutableListOf<ExprNode>()
+						while (true) {
+							list += takeExpr()
+							val splitter = take()
+							if (splitter == Token.RightParenthesis) break
+							else splitter.expect<Token.Comma>()
+						}
+						InvocationNode(token.name, list)
+					} else {
+						take()
+						InvocationNode(token.name, emptyList())
+					}
+				} else ValueNode(token.name)
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
 			is Token.Constant -> ConstantNode(token.type, token.literal)
 			else -> unexpected(token)
@@ -118,10 +137,20 @@ internal class Parser(private val lexer: Lexer) {
 		} else PrototypeNode(name, Type.Unit.name, args)
 	}
 
-	fun takeFunction(): FunctionNode {
+	fun takeFunctionOrPrototype(): ASTNode {
 		take().expect<Token.Function>()
 		val prototype = takePrototype()
-		val body = takeBlock()
-		return FunctionNode(prototype, body)
+		return if (peek() is Token.LeftBrace) FunctionNode(prototype, takeBlock())
+		else prototype
+	}
+
+	fun parse(): TopLevelNode {
+		val list = mutableListOf<ASTNode>()
+		while (true) {
+			when (peek()) {
+				is Token.Function -> list += takeFunctionOrPrototype()
+				is Token.EOF -> return TopLevelNode(list)
+			}
+		}
 	}
 }

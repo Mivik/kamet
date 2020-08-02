@@ -1,8 +1,9 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
+import com.mivik.kamet.Type
 import com.mivik.kamet.Value
-import org.bytedeco.javacpp.PointerPointer
+import com.mivik.kamet.asVal
 import org.bytedeco.llvm.global.LLVM
 
 internal class PrototypeNode(
@@ -12,18 +13,17 @@ internal class PrototypeNode(
 ) : ASTNode {
 	override fun codegen(context: Context): Value {
 		val returnType = context.lookupType(returnTypeName)
-		val functionType =
-			LLVM.LLVMFunctionType(
-				returnType.llvm,
-				PointerPointer(*Array(parameters.size) { context.lookupType(parameters[it].second).llvm }),
-				parameters.size,
-				0
-			)
-		val function = LLVM.LLVMAddFunction(context.module, name, functionType)
+		val functionType = Type.Function(
+			returnType,
+			parameters.map { context.lookupType(it.second) }
+		)
+		val function = LLVM.LLVMAddFunction(context.module, name, functionType.llvm)
 		for (i in parameters.indices) {
 			val paramName = parameters[i].first
 			LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, i), paramName, paramName.length.toLong())
 		}
-		return Value.Empty
+		return Value(function, functionType).also {
+			context.declare(name, it.asVal())
+		}
 	}
 }

@@ -5,8 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 internal class ParserTest {
-	private fun String.evaluate(): Value =
-		Parser(this).takeExpr().codegen(Context.topLevel("evaluate"))
+	private fun String.evaluate(context: Context = Context.topLevel("evaluate")): Value =
+		Parser(this).takeExpr().codegen(context)
 
 	@Test
 	fun testUnsigned() {
@@ -23,16 +23,17 @@ internal class ParserTest {
 	@Test
 	fun test() {
 		val str = """
-			fun plus(a: Int, b: Int): Int {
-				val c = a*a
-				val d = b*b
-				return c+d
+			fun putchar(char: Int): Int
+			
+			fun main(): Int {
+				putchar(putchar(113))
+				return 0
 			}
 		""".trimIndent()
 		val parser = Parser(str)
 		val context = Context.topLevel("test")
-		val function = parser.takeFunction()
-		function.codegen(context)
+		val list = parser.parse()
+		list.codegen(context)
 		LLVM.LLVMDumpModule(context.module)
 	}
 }

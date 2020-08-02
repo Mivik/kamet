@@ -1,5 +1,6 @@
 package com.mivik.kamet
 
+import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.global.LLVM
 
@@ -59,6 +60,24 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? 
 			get() = 0
 
 		override fun isSubtypeOf(other: Type): Boolean = other == Unit
+	}
+
+	class Function(val returnType: Type, val parameterTypes: List<Type>) : Type(
+		buildString {
+			append('(')
+			append(parameterTypes.joinToString(", ") { it.name })
+			append(") -> ")
+			append(returnType.name)
+		},
+		LLVM.LLVMFunctionType(
+			returnType.llvm,
+			PointerPointer(*Array(parameterTypes.size) { parameterTypes[it].llvm }),
+			parameterTypes.size,
+			0
+		)
+	) {
+		override val sizeInBits: Int
+			get() = error("Attempt to get the size of a function")
 	}
 
 	sealed class Primitive(name: String, override val sizeInBits: Int, llvm: LLVMTypeRef) : Type(name, llvm) {
