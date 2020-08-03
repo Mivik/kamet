@@ -13,6 +13,8 @@ internal class ValDeclareNode(val name: String, val defaultValue: ASTNode) : AST
 		LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
 		return Value.Nothing
 	}
+
+	override fun toString(): String = "val $name = $defaultValue"
 }
 
 internal class VarDeclareNode(val name: String, val defaultValue: ASTNode) : ASTNode {
@@ -20,4 +22,6 @@ internal class VarDeclareNode(val name: String, val defaultValue: ASTNode) : AST
 		context.declareVariable(name, defaultValue.codegen(context))
 		return Value.Nothing
 	}
+
+	override fun toString(): String = "var $name = $defaultValue"
 }

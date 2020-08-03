@@ -28,4 +28,6 @@ internal class InvocationNode(val functionName: String, val elements: List<ASTNo
 			), functionType.returnType
 		)
 	}
+
+	override fun toString(): String = "$functionName(${elements.joinToString(", ")})"
 }

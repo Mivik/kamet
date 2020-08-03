@@ -5,6 +5,7 @@ import com.mivik.kamet.ast.AssignNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
+import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.InvocationNode
@@ -134,6 +135,15 @@ internal class Parser(private val lexer: Lexer) {
 				take().expect<Token.RightParenthesis>()
 				WhileNode(condition, takeBlockOrStmt())
 			}
+			Token.Do -> {
+				take()
+				val block = takeBlockOrStmt()
+				take().expect<Token.While>()
+				take().expect<Token.LeftParenthesis>()
+				val condition = takeExpr()
+				take().expect<Token.RightParenthesis>()
+				DoWhileNode(block, condition)
+			}
 			is Token.Identifier -> {
 				val token = take() as Token.Identifier
 				if (peek() == Token.Assign) {
@@ -150,8 +160,11 @@ internal class Parser(private val lexer: Lexer) {
 	fun takeBlock(): BlockNode {
 		take().expect<Token.LeftBrace>()
 		val block = BlockNode()
-		while (peek() != Token.RightBrace)
-			block.elements += takeStmt()
+		while (peek() != Token.RightBrace) {
+			val stmt = takeStmt()
+			block.elements += stmt
+			if (stmt.returned) break
+		}
 		take()
 		return block
 	}

@@ -17,4 +17,9 @@ internal class ReturnNode(val value: ASTNode) : ASTNode {
 		else LLVM.LLVMBuildRet(context.builder, result.llvm)
 		return Value.Nothing
 	}
+
+	override fun toString(): String = "return $value"
+
+	override val returned: Boolean
+		get() = true
 }

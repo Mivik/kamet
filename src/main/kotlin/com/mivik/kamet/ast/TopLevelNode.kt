@@ -8,4 +8,6 @@ internal class TopLevelNode(val elements: List<ASTNode>) : ASTNode {
 		for (element in elements) element.codegen(context)
 		return Value.Nothing
 	}
+
+	override fun toString(): String = elements.joinToString("\n\n")
 }

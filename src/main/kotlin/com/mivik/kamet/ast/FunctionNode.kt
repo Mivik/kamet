@@ -27,4 +27,6 @@ internal class FunctionNode(
 		context.declare(prototype.name, function.asVal())
 		return function
 	}
+
+	override fun toString(): String = "$prototype $body"
 }

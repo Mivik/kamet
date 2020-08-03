@@ -26,4 +26,7 @@ internal class PrototypeNode(
 			context.declare(name, it.asVal())
 		}
 	}
+
+	override fun toString(): String =
+		"fun $name(${parameters.joinToString(", ") { "${it.first}: ${it.second}" }})${if (returnTypeName == Type.Unit.name) "" else ": $returnTypeName"}"
 }

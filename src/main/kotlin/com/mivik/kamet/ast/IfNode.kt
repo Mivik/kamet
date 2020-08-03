@@ -14,7 +14,8 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 		if (elseBlock == null) {
 			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, llvmThenBlock, llvmElseBlock)
 			context.setBlock(llvmThenBlock)
-			LLVM.LLVMBuildBr(builder, llvmElseBlock)
+			thenBlock.codegen(context)
+			if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, llvmElseBlock)
 			context.setBlock(llvmElseBlock)
 			return Value.Nothing
 		} else {
@@ -28,20 +29,27 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 				val variable = context.declareVariable("if_result", thenRet.type.undefined())
 				context.setBlock(llvmThenBlock)
 				variable.set(context, thenRet)
-				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
+				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
 				context.setBlock(llvmElseBlock)
 				variable.set(context, elseRet)
-				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
+				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
 				context.setBlock(llvmFinalBlock)
 				variable.get(context)
 			} else {
 				context.setBlock(llvmThenBlock)
-				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
+				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
 				context.setBlock(llvmElseBlock)
-				LLVM.LLVMBuildBr(builder, llvmFinalBlock)
+				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
 				context.setBlock(llvmFinalBlock)
 				Value.Nothing
 			}
 		}
 	}
+
+	override fun toString(): String =
+		if (elseBlock == null) "if $condition $thenBlock"
+		else "if ($condition) $thenBlock else $elseBlock"
+
+	override val returned: Boolean
+		get() = thenBlock.returned && elseBlock != null && elseBlock.returned
 }
