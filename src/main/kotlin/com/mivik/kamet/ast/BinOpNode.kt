@@ -5,6 +5,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.IllegalCastException
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
+import com.mivik.kamet.ValueRef
 import com.mivik.kamet.unreachable
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.global.LLVM.*
@@ -61,16 +62,28 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 		)
 	}
 
-	override fun codegen(context: Context): Value {
-		val evaluatedLHS = lhs.codegen(context)
-		val evaluatedRHS = rhs.codegen(context)
-		val operandType = getOperandType(evaluatedLHS, evaluatedRHS)
+	override fun codegen(context: Context): Value =
+		if (op is BinOp.Assign) {
+			val lhs = lhs.codegen(context)
+			val rhs = rhs.codegen(context).dereference(context)
+			require((lhs is ValueRef) && !lhs.isConst) { "Assign on a value or const reference" }
+			lhs.set(context, codegen(context, lhs.dereference(context), rhs, op.originalOp))
+			lhs
+		} else codegen(
+			context,
+			lhs.codegen(context).dereference(context),
+			rhs.codegen(context).dereference(context),
+			op
+		)
+
+	private fun codegen(context: Context, lhs: Value, rhs: Value, op: BinOp): Value {
+		val operandType = getOperandType(lhs, rhs)
 		val type =
 			if (op.returnBoolean) Type.Primitive.Boolean
 			else operandType
 		val builder = context.builder
-		val lhsValue = lift(builder, evaluatedLHS, operandType).llvm
-		val rhsValue = lift(builder, evaluatedRHS, operandType).llvm
+		val lhsValue = lift(builder, lhs, operandType).llvm
+		val rhsValue = lift(builder, rhs, operandType).llvm
 		if (operandType == Type.Primitive.Boolean) {
 			return Value(
 				when (op) {

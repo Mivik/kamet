@@ -7,7 +7,7 @@ import org.bytedeco.llvm.LLVM.LLVMModuleRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
-internal class Context(
+class Context(
 	val parent: Context?,
 	val module: LLVMModuleRef,
 	val builder: LLVMBuilderRef,

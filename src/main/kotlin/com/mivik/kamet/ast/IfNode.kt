@@ -34,7 +34,7 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 				variable.set(context, elseRet)
 				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
 				context.setBlock(llvmFinalBlock)
-				variable.get(context)
+				variable.dereference(context)
 			} else {
 				context.setBlock(llvmThenBlock)
 				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)

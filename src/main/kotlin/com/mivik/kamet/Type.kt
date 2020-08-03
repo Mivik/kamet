@@ -4,7 +4,7 @@ import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.global.LLVM
 
-sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? = Any) {
+sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	companion object {
 		val defaultTypes = arrayOf(
 			Any,
@@ -26,43 +26,29 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? 
 
 		fun defaultTypeMap(): MutableMap<String, Type> =
 			mutableMapOf<String, Type>().apply {
-				for (type in defaultTypes) this[type.name] = type
+				for (type in defaultTypes)
+					this[type.name] = type
 			}
 	}
-
-	abstract val sizeInBits: Int // TODO this is not always int!
 
 	override fun toString(): String = javaClass.simpleName
 
 	open fun isSubtypeOf(other: Type): Boolean {
-		if (other == Any) return true
-		var current = this
-		while (current != other) current = current.superType ?: return false
-		return true
+		if (this == other) return true
+		return when (this) {
+			Nothing -> true
+			else -> false
+		}
 	}
 
-	fun isSuperTypeOf(other: Type): Boolean = other.isSubtypeOf(this)
+	@Suppress("NOTHING_TO_INLINE")
+	inline fun isSuperTypeOf(other: Type): Boolean = other.isSubtypeOf(this)
 
 	fun undefined(): Value = Value(LLVM.LLVMGetUndef(llvm), this)
 
-	object Any : Type("Any", LLVM.LLVMVoidType(), null) {
-		override val sizeInBits: Int
-			get() = 0
-	}
-
-	object Nothing : Type("Nothing", LLVM.LLVMVoidType()) {
-		override val sizeInBits: Int
-			get() = 0
-
-		override fun isSubtypeOf(other: Type): Boolean = true
-	}
-
-	object Unit : Type("Unit", LLVM.LLVMVoidType()) {
-		override val sizeInBits: Int
-			get() = 0
-
-		override fun isSubtypeOf(other: Type): Boolean = other == Unit
-	}
+	object Any : Type("Any", LLVM.LLVMVoidType())
+	object Nothing : Type("Nothing", LLVM.LLVMVoidType())
+	object Unit : Type("Unit", LLVM.LLVMVoidType())
 
 	class Function(val returnType: Type, val parameterTypes: List<Type>) : Type(
 		buildString {
@@ -78,9 +64,6 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? 
 			0
 		)
 	) {
-		override val sizeInBits: Int
-			get() = error("Attempt to get the size of a function")
-
 		override fun equals(other: kotlin.Any?): Boolean =
 			if (other is Function) returnType == other.returnType && parameterTypes == other.parameterTypes
 			else false
@@ -90,9 +73,14 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? 
 			result = 31 * result + parameterTypes.hashCode()
 			return result
 		}
+
+		override fun isSubtypeOf(other: Type): Boolean =
+			if (other is Function)
+				returnType.isSubtypeOf(other.returnType) && parameterTypes == other.parameterTypes
+			else super.isSubtypeOf(other)
 	}
 
-	sealed class Primitive(name: String, override val sizeInBits: Int, llvm: LLVMTypeRef) : Type(name, llvm) {
+	sealed class Primitive(name: String, val sizeInBits: Int, llvm: LLVMTypeRef) : Type(name, llvm) {
 		object Boolean : Primitive("Boolean", 1, LLVM.LLVMIntType(1))
 
 		sealed class Integer(name: String, sizeInBits: kotlin.Int, val signed: kotlin.Boolean) :
@@ -114,4 +102,16 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef, val superType: Type? 
 			object Double : Real("Double", 64, LLVM.LLVMDoubleType())
 		}
 	}
+
+	class Reference(val originalType: Type, val isConst: Boolean) :
+		Type("${if (isConst) "const " else ""}${originalType.name}&", originalType.llvm.pointer()) {
+		override fun isSubtypeOf(other: Type): Boolean =
+			if (other is Reference)
+				(isConst <= other.isConst) && originalType.isSubtypeOf(other.originalType)
+			else super.isSubtypeOf(other)
+	}
 }
+
+fun Type.reference(): Type = Type.Reference(this, false)
+fun Type.constReference(): Type = Type.Reference(this, true)
+fun Type.dereference(): Type = if (this is Type.Reference) originalType else this

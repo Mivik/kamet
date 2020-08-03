@@ -12,6 +12,7 @@ import com.mivik.kamet.ast.InvocationNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
 import com.mivik.kamet.ast.TopLevelNode
+import com.mivik.kamet.ast.UnaryOpNode
 import com.mivik.kamet.ast.ValDeclareNode
 import com.mivik.kamet.ast.ValueNode
 import com.mivik.kamet.ast.VarDeclareNode
@@ -52,6 +53,14 @@ internal class Parser(private val lexer: Lexer) {
 		var currentLHS = lhs
 		while (true) {
 			val current = peek()
+			if (current == UnaryOp.Increment || current == UnaryOp.Decrement) {
+				take()
+				return UnaryOpNode(
+					current as UnaryOp,
+					currentLHS,
+					true
+				)
+			}
 			val currentPrecedence = precedenceOf(current)
 			if (currentPrecedence <= precedence) return currentLHS
 			take()
@@ -84,7 +93,7 @@ internal class Parser(private val lexer: Lexer) {
 				} else ValueNode(token.name)
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
 			is Token.Constant -> ConstantNode(token.type, token.literal)
-			is Token.If -> {
+			Token.If -> {
 				take().expect<Token.LeftParenthesis>()
 				val condition = takeExpr()
 				take().expect<Token.RightParenthesis>()
@@ -94,6 +103,14 @@ internal class Parser(private val lexer: Lexer) {
 					IfNode(condition, thenBlock, takeBlockOrStmt())
 				} else IfNode(condition, thenBlock)
 			}
+			BinOp.Plus -> takeExpr() // just ignore it
+			BinOp.Minus, is UnaryOp ->
+				UnaryOpNode(
+					when (token) {
+						BinOp.Minus -> UnaryOp.Negative
+						else -> token as UnaryOp
+					}, takePrimary()
+				)
 			else -> unexpected(token)
 		}
 

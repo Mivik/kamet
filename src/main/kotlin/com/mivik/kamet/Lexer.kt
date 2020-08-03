@@ -5,6 +5,7 @@ import org.kiot.lexer.Lexer
 import org.kiot.lexer.LexerAction
 import org.kiot.lexer.LexerData
 import org.kiot.lexer.LexerState
+import org.kiot.util.binarySize
 
 private class IllegalEscapeException(private val char: Char) : IllegalArgumentException() {
 	override val message: String?
@@ -45,25 +46,45 @@ internal sealed class Token {
 	}
 }
 
-internal sealed class BinOp(val symbol: String, val precedence: Int, val returnBoolean: Boolean = false) : Token() {
-	object Plus : BinOp("+", 8)
-	object Minus : BinOp("-", 8)
-	object Multiply : BinOp("*", 9)
-	object Divide : BinOp("/", 9)
-	object Reminder : BinOp("%", 9)
-	object Equal : BinOp("==", 5, true)
-	object NotEqual : BinOp("!=", 5, true)
-	object Less : BinOp("<", 6, true)
-	object LessOrEqual : BinOp("<=", 6, true)
-	object Greater : BinOp(">", 6, true)
-	object GreaterOrEqual : BinOp(">=", 6, true)
-	object ShiftLeft : BinOp("<<", 7)
-	object ShiftRight : BinOp(">>", 7)
-	object And : BinOp("&&", 1, true)
-	object Or : BinOp("||", 0, true)
-	object BitwiseAnd : BinOp("&", 4)
-	object BitwiseOr : BinOp("|", 2)
-	object Xor : BinOp("^", 3)
+internal sealed class UnaryOp(val symbol: String) : Token() {
+	object Negative : UnaryOp("-")
+	object Inverse : UnaryOp("~")
+	object Not : UnaryOp("!")
+	object Increment : UnaryOp("++")
+	object Decrement : UnaryOp("--")
+}
+
+internal open class BinOp(val symbol: String, val precedence: Int, val returnBoolean: Boolean = false) : Token() {
+	object Plus : BinOp("+", 9)
+	object Minus : BinOp("-", 9)
+	object Multiply : BinOp("*", 10)
+	object Divide : BinOp("/", 10)
+	object Reminder : BinOp("%", 10)
+	object Equal : BinOp("==", 6, true)
+	object NotEqual : BinOp("!=", 6, true)
+	object Less : BinOp("<", 7, true)
+	object LessOrEqual : BinOp("<=", 7, true)
+	object Greater : BinOp(">", 7, true)
+	object GreaterOrEqual : BinOp(">=", 7, true)
+	object ShiftLeft : BinOp("<<", 8)
+	object ShiftRight : BinOp(">>", 8)
+	object And : BinOp("&&", 2, true)
+	object Or : BinOp("||", 1, true)
+	object BitwiseAnd : BinOp("&", 5)
+	object BitwiseOr : BinOp("|", 3)
+	object Xor : BinOp("^", 4)
+
+	open class Assign(val originalOp: BinOp) : BinOp(originalOp.symbol + "=", 0)
+	object PlusAssign : Assign(Plus)
+	object MinusAssign : Assign(Minus)
+	object MultiplyAssign : Assign(Multiply)
+	object DivideAssign : Assign(Divide)
+	object ReminderAssign : Assign(Reminder)
+	object BitwiseAndAssign : Assign(BitwiseAnd)
+	object BitwiseOrAssign : Assign(BitwiseOr)
+	object XorAssign : Assign(Xor)
+	object ShiftLeftAssign : Assign(ShiftLeft)
+	object ShiftRightAssign : Assign(ShiftRight)
 }
 
 private enum class State : LexerState {
@@ -73,18 +94,21 @@ private enum class State : LexerState {
 private enum class Action : LexerAction {
 	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT,
 	IDENTIFIER, ASSIGN, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
-	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO
+	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN
 }
 
 internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 	companion object {
 		val data = LexerData.build {
 			options.strict = false
+			options.minimize = true
 			state(default) {
 				"[ \t]+".ignore()
 				"\r|\n|\r\n".ignore()
-				"&&|==|!=|<<|>>|<=|>=|\\|\\|" action Action.DOUBLE_CHAR_OPERATOR
-				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,]" action Action.SINGLE_CHAR_OPERATOR
+				"<<=" action Action.SHIFT_LEFT_ASSIGN
+				">>=" action Action.SHIFT_RIGHT_ASSIGN
+				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--" action Action.DOUBLE_CHAR_OPERATOR
+				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,~!]" action Action.SINGLE_CHAR_OPERATOR
 				"val" action Action.VAL
 				"var" action Action.VAR
 				"fun" action Action.FUNCTION
@@ -97,11 +121,11 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"[\\w\$_][\\w\\d\$_]*" action Action.IDENTIFIER
 				"\\d+UL" action Action.UNSIGNED_LONG_LITERAL
 				"\\d+U" action Action.UNSIGNED_INT_LITERAL
-				"-?\\d+L" action Action.LONG_LITERAL
-				"-?\\d+" action Action.INT_LITERAL
+				"\\d+L" action Action.LONG_LITERAL
+				"\\d+" action Action.INT_LITERAL
 				"=" action Action.ASSIGN
 				"\"" action Action.ENTER_STRING
-				"(-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+\\-]?[0-9]*)?)|Infinity|-Infinity|NaN" action Action.DOUBLE_LITERAL
+				"((0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+\\-]?[0-9]*)?)|Infinity|-Infinity|NaN" action Action.DOUBLE_LITERAL
 			}
 			state(State.IN_STRING) {
 				"\\\\u[0-9a-fA-F]{4}" action Action.UNICODE_CHAR
@@ -137,6 +161,8 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.LONG_LITERAL ->
 				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integer.Long))
 			Action.BOOLEAN_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Boolean))
+			Action.SHIFT_LEFT_ASSIGN -> returnValue(BinOp.ShiftLeftAssign)
+			Action.SHIFT_RIGHT_ASSIGN -> returnValue(BinOp.ShiftRightAssign)
 			Action.DOUBLE_CHAR_OPERATOR -> returnValue(
 				when (string()) {
 					"==" -> BinOp.Equal
@@ -147,6 +173,16 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					">>" -> BinOp.ShiftRight
 					"&&" -> BinOp.And
 					"||" -> BinOp.Or
+					"++" -> UnaryOp.Increment
+					"--" -> UnaryOp.Decrement
+					"+=" -> BinOp.PlusAssign
+					"-=" -> BinOp.MinusAssign
+					"*=" -> BinOp.MultiplyAssign
+					"/=" -> BinOp.DivideAssign
+					"%=" -> BinOp.ReminderAssign
+					"&=" -> BinOp.BitwiseAndAssign
+					"|=" -> BinOp.BitwiseOrAssign
+					"^=" -> BinOp.XorAssign
 					else -> unreachable()
 				}
 			)
@@ -159,8 +195,8 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					'&' -> BinOp.BitwiseAnd
 					'|' -> BinOp.BitwiseOr
 					'^' -> BinOp.Xor
-					'<' -> BinOp.Less
 					'>' -> BinOp.Greater
+					'<' -> BinOp.Less
 					'%' -> BinOp.Reminder
 					'{' -> Token.LeftBrace
 					'}' -> Token.RightBrace
@@ -168,6 +204,8 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					')' -> Token.RightParenthesis
 					':' -> Token.Colon
 					',' -> Token.Comma
+					'~' -> UnaryOp.Inverse
+					'!' -> UnaryOp.Not
 					else -> unreachable()
 				}
 			)

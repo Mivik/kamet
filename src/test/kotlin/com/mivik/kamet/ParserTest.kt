@@ -29,10 +29,8 @@ internal class ParserTest {
 			
 			fun main(): Int {
 				var i = 0
-				do {
-					putchar(65+i)
-					i = i+1
-				} while (i!=26)
+				putchar(48+(i++))
+				putchar(48+i)
 				return 0
 			}
 		""".trimIndent()
@@ -40,7 +38,7 @@ internal class ParserTest {
 		val context = Context.topLevel("test")
 		val node = parser.parse()
 		node.codegen(context)
-		if (false) {
+		if (true) {
 			val pass = LLVM.LLVMCreatePassManager()
 			LLVM.LLVMAddConstantPropagationPass(pass)
 			LLVM.LLVMAddInstructionCombiningPass(pass)
