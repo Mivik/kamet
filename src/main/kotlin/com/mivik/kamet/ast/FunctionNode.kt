@@ -1,10 +1,7 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
-import com.mivik.kamet.Type
 import com.mivik.kamet.Value
-import com.mivik.kamet.ValueRef
-import com.mivik.kamet.asVal
 import org.bytedeco.llvm.global.LLVM
 
 internal class FunctionNode(
@@ -21,10 +18,10 @@ internal class FunctionNode(
 		for (i in parameters.indices)
 			subContext.declare(
 				parameters[i].first,
-				Value(LLVM.LLVMGetParam(function.llvm, i), context.lookupType(parameters[i].second)).asVal()
+				Value(LLVM.LLVMGetParam(function.llvm, i), parameters[i].second.translate(context))
 			)
 		body.codegen(subContext)
-		context.declare(prototype.name, function.asVal())
+		context.declare(prototype.name, function)
 		return function
 	}
 

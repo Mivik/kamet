@@ -63,18 +63,28 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 	}
 
 	override fun codegen(context: Context): Value =
-		if (op is BinOp.Assign) {
-			val lhs = lhs.codegen(context)
-			val rhs = rhs.codegen(context).dereference(context)
-			require((lhs is ValueRef) && !lhs.isConst) { "Assign on a value or const reference" }
-			lhs.set(context, codegen(context, lhs.dereference(context), rhs, op.originalOp))
-			lhs
-		} else codegen(
-			context,
-			lhs.codegen(context).dereference(context),
-			rhs.codegen(context).dereference(context),
-			op
-		)
+		when (op) {
+			is BinOp.AssignOperators -> {
+				val lhs = lhs.codegen(context)
+				val rhs = rhs.codegen(context).dereference(context)
+				require(lhs is ValueRef && !lhs.isConst) { "Assigning to a non-reference type: ${lhs.type}" }
+				lhs.set(context, codegen(context, lhs.dereference(context), rhs, op.originalOp))
+				lhs
+			}
+			BinOp.Assign -> {
+				val lhs = lhs.codegen(context)
+				val rhs = rhs.codegen(context).dereference(context)
+				require(lhs is ValueRef && !lhs.isConst) { "Assigning to a non-reference type: ${lhs.type}" }
+				lhs.set(context, rhs)
+				lhs
+			}
+			else -> codegen(
+				context,
+				lhs.codegen(context).dereference(context),
+				rhs.codegen(context).dereference(context),
+				op
+			)
+		}
 
 	private fun codegen(context: Context, lhs: Value, rhs: Value, op: BinOp): Value {
 		val operandType = getOperandType(lhs, rhs)

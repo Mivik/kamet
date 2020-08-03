@@ -11,7 +11,7 @@ internal class InvocationNode(val functionName: String, val elements: List<ASTNo
 		// TODO polymorphism
 		val function = context.lookupValue(functionName).dereference(context)
 		val functionType = function.type
-		if (functionType !is Type.Function) error("Attempt to invoke non-function \"$functionName\": ${function.type}")
+		if (functionType !is Type.Function) error("Attempt to invoke non-function $functionName: ${function.type}")
 		val parameterTypes = functionType.parameterTypes
 		if (elements.size != parameterTypes.size) error("Expected ${parameterTypes.size} arguments for function $functionName, got ${elements.size}")
 		val arguments = elements.map { it.codegen(context) }

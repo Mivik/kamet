@@ -5,16 +5,28 @@ import com.mivik.kamet.Type
 import com.mivik.kamet.UnaryOp
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
+import com.mivik.kamet.pointer
 import com.mivik.kamet.unreachable
 import org.bytedeco.llvm.global.LLVM
 
 internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boolean = false) : ASTNode {
 	override fun codegen(context: Context): Value {
 		val builder = context.builder
-		val value = value.codegen(context)
+		var value = value.codegen(context)
 		when (op) {
+			UnaryOp.Indirection -> {
+				value = value.dereference(context)
+				val type = value.type
+				require(type is Type.Pointer) { "Indirection of a non-pointer type: ${value.type}" }
+				return ValueRef(value.llvm, type.originalType, type.isConst)
+			}
+			UnaryOp.AddressOf -> {
+				require(value is ValueRef) { "Taking the address of a non-reference type: ${value.type}" }
+				val type = value.type as Type.Reference
+				return Value(value.llvm, type.originalType.pointer(type.isConst))
+			}
 			UnaryOp.Increment -> {
-				require((value is ValueRef) && !value.isConst) { "Increment on a value or const reference" }
+				require(value is ValueRef && !value.isConst) { "Increment on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
 				val ret = if (after) value.dereference(context) else value
 				value.set(
@@ -41,7 +53,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 				return ret
 			}
 			UnaryOp.Decrement -> {
-				require((value is ValueRef) && !value.isConst) { "Decrement on a value or const reference" }
+				require(value is ValueRef && !value.isConst) { "Decrement on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
 				val ret = if (after) value.dereference(context) else value
 				value.set(

@@ -29,8 +29,9 @@ internal class ParserTest {
 			
 			fun main(): Int {
 				var i = 0
-				putchar(48+(i++))
-				putchar(48+i)
+				val ref = &i
+				*ref = 5
+				putchar(48+*ref)
 				return 0
 			}
 		""".trimIndent()

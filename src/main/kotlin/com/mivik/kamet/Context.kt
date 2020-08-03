@@ -12,7 +12,7 @@ class Context(
 	val module: LLVMModuleRef,
 	val builder: LLVMBuilderRef,
 	val currentFunction: Value?,
-	private val valueMap: MutableMap<String, ValueRef>,
+	private val valueMap: MutableMap<String, Value>,
 	private val typeMap: MutableMap<String, Type>
 ) {
 	companion object {
@@ -30,7 +30,7 @@ class Context(
 	val llvmFunction: LLVMValueRef
 		get() = currentFunction!!.llvm
 
-	fun lookupValueOrNull(name: String): ValueRef? {
+	fun lookupValueOrNull(name: String): Value? {
 		var current = this
 		while (true) {
 			current.valueMap[name]?.let { return it }
@@ -38,7 +38,7 @@ class Context(
 		}
 	}
 
-	fun lookupValue(name: String): ValueRef = lookupValueOrNull(name) ?: error("Unknown identifier ${name.escape()}")
+	fun lookupValue(name: String): Value = lookupValueOrNull(name) ?: error("Unknown identifier ${name.escape()}")
 
 	fun hasValue(name: String): Boolean = valueMap.containsKey(name)
 
@@ -52,8 +52,8 @@ class Context(
 
 	fun lookupType(name: String): Type = lookupTypeOrNull(name) ?: error("Unknown type ${name.escape()}")
 
-	fun declare(name: String, valueRef: ValueRef) {
-		valueMap[name] = valueRef
+	fun declare(name: String, value: Value) {
+		valueMap[name] = value
 	}
 
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
@@ -64,13 +64,13 @@ class Context(
 		LLVM.LLVMPositionBuilderAtEnd(builder, block)
 	}
 
-	fun declareVariable(name: String, value: Value): ValueRef.Var {
+	fun declareVariable(name: String, value: Value): ValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
 		val entryBlock = LLVM.LLVMGetEntryBasicBlock(function)
 		val tmpBuilder = LLVM.LLVMCreateBuilder()
 		LLVM.LLVMPositionBuilder(tmpBuilder, entryBlock, LLVM.LLVMGetFirstInstruction(entryBlock))
 		val address = LLVM.LLVMBuildAlloca(tmpBuilder, value.type.llvm, name)
-		val ret = ValueRef.Var(address, value.type)
+		val ret = ValueRef(address, value.type, false)
 		LLVM.LLVMSetValueName2(address, name, name.length.toLong())
 		LLVM.LLVMDisposeBuilder(tmpBuilder)
 		declare(name, ret)

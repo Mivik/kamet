@@ -104,14 +104,43 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	}
 
 	class Reference(val originalType: Type, val isConst: Boolean) :
-		Type("${if (isConst) "const " else ""}${originalType.name}&", originalType.llvm.pointer()) {
+		Type("&${if (isConst) "const " else ""}(${originalType.name})", originalType.llvm.pointer()) {
+		init {
+			require(originalType !is Reference) { "Creating a reference of a reference" }
+		}
+
 		override fun isSubtypeOf(other: Type): Boolean =
 			if (other is Reference)
 				(isConst <= other.isConst) && originalType.isSubtypeOf(other.originalType)
 			else super.isSubtypeOf(other)
+
+		override fun equals(other: kotlin.Any?): Boolean =
+			if (other is Reference)
+				isConst == other.isConst && originalType == other.originalType
+			else false
+
+		override fun hashCode(): Int = originalType.hashCode()
+	}
+
+	class Pointer(val originalType: Type, val isConst: Boolean) :
+		Type("*${if (isConst) "const " else ""}(${originalType.name})", originalType.llvm.pointer()) {
+		init {
+			require(originalType !is Reference) { "Creating a pointer to a reference" }
+		}
+
+		override fun isSubtypeOf(other: Type): Boolean =
+			if (other is Pointer)
+				(isConst <= other.isConst) && originalType.isSubtypeOf(other.originalType)
+			else super.isSubtypeOf(other)
+
+		override fun equals(other: kotlin.Any?): Boolean =
+			if (other is Pointer)
+				isConst == other.isConst && originalType == other.originalType
+			else false
+
+		override fun hashCode(): Int = originalType.hashCode()
 	}
 }
 
-fun Type.reference(): Type = Type.Reference(this, false)
-fun Type.constReference(): Type = Type.Reference(this, true)
-fun Type.dereference(): Type = if (this is Type.Reference) originalType else this
+fun Type.reference(isConst: Boolean = false): Type = Type.Reference(this, isConst)
+fun Type.pointer(isConst: Boolean = false): Type = Type.Pointer(this, isConst)

@@ -1,7 +1,6 @@
 package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
-import com.mivik.kamet.ast.AssignNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
@@ -42,6 +41,23 @@ internal class Parser(private val lexer: Lexer) {
 		return this
 	}
 
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun trim() {
+		while (peek() == Token.Newline) take()
+	}
+
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun trimAndPeek(): Token {
+		trim()
+		return peek()
+	}
+
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun trimAndTake(): Token {
+		trim()
+		return take()
+	}
+
 	private fun unexpected(token: Token): Nothing = error("Unexpected $token")
 
 	private fun precedenceOf(token: Token) =
@@ -73,7 +89,7 @@ internal class Parser(private val lexer: Lexer) {
 	}
 
 	private fun takePrimary(): ASTNode =
-		when (val token = take()) {
+		when (val token = trimAndTake()) {
 			is Token.Identifier ->
 				if (peek() == Token.LeftParenthesis) {
 					take()
@@ -104,13 +120,10 @@ internal class Parser(private val lexer: Lexer) {
 				} else IfNode(condition, thenBlock)
 			}
 			BinOp.Plus -> takeExpr() // just ignore it
-			BinOp.Minus, is UnaryOp ->
-				UnaryOpNode(
-					when (token) {
-						BinOp.Minus -> UnaryOp.Negative
-						else -> token as UnaryOp
-					}, takePrimary()
-				)
+			is UnaryOp -> UnaryOpNode(token, takePrimary())
+			BinOp.Minus -> UnaryOpNode(UnaryOp.Negative, takePrimary())
+			BinOp.Multiply -> UnaryOpNode(UnaryOp.Indirection, takePrimary())
+			BinOp.BitwiseAnd -> UnaryOpNode(UnaryOp.AddressOf, takePrimary())
 			else -> unexpected(token)
 		}
 
@@ -127,18 +140,18 @@ internal class Parser(private val lexer: Lexer) {
 		}
 
 	fun takeStmt(): ASTNode =
-		when (peek()) {
+		when (trimAndPeek()) {
 			Token.Val -> {
 				take()
 				// TODO better error output for stuff like this (should output "Expected xxx, got xxx" instead of throwing an cast error)
 				val name = (take() as Token.Identifier).name
-				take().expect<Token.Assign>()
+				take().expect<BinOp.Assign>()
 				ValDeclareNode(name, takeExpr())
 			}
 			Token.Var -> {
 				take()
 				val name = (take() as Token.Identifier).name
-				take().expect<Token.Assign>()
+				take().expect<BinOp.Assign>()
 				VarDeclareNode(name, takeExpr())
 			}
 			Token.Return -> {
@@ -161,41 +174,52 @@ internal class Parser(private val lexer: Lexer) {
 				take().expect<Token.RightParenthesis>()
 				DoWhileNode(block, condition)
 			}
-			is Token.Identifier -> {
-				val token = take() as Token.Identifier
-				if (peek() == Token.Assign) {
-					take()
-					AssignNode(token.name, takeExpr())
-				} else {
-					off(token)
-					takeExpr()
-				}
-			}
 			else -> takeExpr()
 		}
 
 	fun takeBlock(): BlockNode {
+		trim()
 		take().expect<Token.LeftBrace>()
 		val block = BlockNode()
-		while (peek() != Token.RightBrace) {
+		var returned = false
+		while (trimAndPeek() != Token.RightBrace) {
 			val stmt = takeStmt()
-			block.elements += stmt
-			if (stmt.returned) break
+			if (!returned) {
+				block.elements += stmt
+				returned = stmt.returned
+			}
 		}
 		take()
 		return block
 	}
 
+	fun takeType(): TypeDescriptor =
+		when (val token = take()) {
+			BinOp.BitwiseAnd -> {
+				val isConst = peek() == Token.Const
+				if (isConst) take()
+				TypeDescriptor.Reference(takeType(), isConst)
+			}
+			BinOp.Multiply -> {
+				val isConst = peek() == Token.Const
+				if (isConst) take()
+				TypeDescriptor.Pointer(takeType(), isConst)
+			}
+			Token.LeftParenthesis -> takeType().also { take().expect<Token.RightParenthesis>() }
+			is Token.Identifier -> TypeDescriptor.Named(token.name)
+			else -> unreachable()
+		}
+
 	fun takePrototype(): PrototypeNode {
+		trim()
 		val name = (take() as Token.Identifier).name
-		val args = mutableListOf<Pair<String, String>>()
+		val args = mutableListOf<Pair<String, TypeDescriptor>>()
 		take().expect<Token.LeftParenthesis>()
 		if (peek() != Token.RightParenthesis)
 			while (true) {
 				val argName = (take() as Token.Identifier).name
 				take().expect<Token.Colon>()
-				val typeName = (take() as Token.Identifier).name
-				args.add(Pair(argName, typeName))
+				args.add(Pair(argName, takeType()))
 				val splitter = take()
 				if (splitter == Token.RightParenthesis) break
 				else splitter.expect<Token.Comma>()
@@ -203,8 +227,8 @@ internal class Parser(private val lexer: Lexer) {
 		else take()
 		return if (peek() == Token.Colon) {
 			take()
-			PrototypeNode(name, (take() as Token.Identifier).name, args)
-		} else PrototypeNode(name, Type.Unit.name, args)
+			PrototypeNode(name, takeType(), args)
+		} else PrototypeNode(name, Type.Unit.asDescriptor(), args)
 	}
 
 	fun takeFunctionOrPrototype(): ASTNode {
@@ -217,9 +241,11 @@ internal class Parser(private val lexer: Lexer) {
 	fun parse(): TopLevelNode {
 		val list = mutableListOf<ASTNode>()
 		while (true) {
+			trim()
 			when (peek()) {
 				is Token.Function -> list += takeFunctionOrPrototype()
-				is Token.EOF -> return TopLevelNode(list)
+				Token.EOF -> return TopLevelNode(list)
+				else -> TODO()
 			}
 		}
 	}
