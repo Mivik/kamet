@@ -13,20 +13,20 @@ internal class PrototypeNode(
 	val name: String,
 	val returnType: TypeDescriptor,
 	val parameters: List<Pair<String, TypeDescriptor>>
-) : AttributedNode(attributes) {
+) : ASTNode {
 	val mangled: String
 		get() = "$name(${parameters.joinToString(",") { "${it.second}" }}):$returnType"
 
 	val functionName: String
 
 	init {
-		var tmp: String? = null
+		var functionName: String? = null
 		for (attr in attributes)
 			when (attr) {
-				Attribute.NATIVE -> tmp = name
-				else -> error("\"$attr\" attribute is not applicable to Prototype")
+				Attribute.NATIVE -> functionName = name
+				else -> attr.notApplicableTo("Prototype")
 			}
-		functionName = tmp ?: mangled
+		this.functionName = functionName ?: mangled
 	}
 
 	override fun codegen(context: Context): Value {

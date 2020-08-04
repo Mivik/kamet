@@ -55,6 +55,11 @@ class Context(
 
 	fun lookupType(name: String): Type = lookupTypeOrNull(name) ?: error("Unknown type ${name.escape()}")
 
+	fun declareType(type: Type) {
+		if (typeMap.containsKey(type.name)) error("Redeclare of type ${type.name}")
+		typeMap[type.name] = type
+	}
+
 	fun declare(name: String, value: Value) {
 		valueMap[name] = value
 	}

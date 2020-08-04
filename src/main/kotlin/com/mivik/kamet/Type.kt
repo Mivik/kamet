@@ -80,6 +80,26 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			else super.isSubtypeOf(other)
 	}
 
+	class Struct(name: String, val elements: List<Pair<String, Type>>, packed: Boolean) :
+		Type(
+			name,
+			LLVM.LLVMStructType(
+				PointerPointer(*Array(elements.size) { elements[it].second.llvm }),
+				elements.size,
+				if (packed) 1 else 0
+			)
+		) {
+		fun memberIndex(name: String) = elements.indexOfFirst { it.first == name }.also {
+			if (it == -1) error("Struct type ${this.name} has no member named $name")
+		}
+
+		@Suppress("NOTHING_TO_INLINE")
+		inline fun memberName(index: Int) = elements[index].first
+
+		@Suppress("NOTHING_TO_INLINE")
+		inline fun memberType(index: Int) = elements[index].second
+	}
+
 	sealed class Primitive(name: String, val sizeInBits: Int, llvm: LLVMTypeRef) : Type(name, llvm) {
 		object Boolean : Primitive("Boolean", 1, LLVM.LLVMIntType(1))
 

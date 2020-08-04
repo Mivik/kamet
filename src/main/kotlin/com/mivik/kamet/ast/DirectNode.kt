@@ -1,0 +1,11 @@
+package com.mivik.kamet.ast
+
+import com.mivik.kamet.Context
+import com.mivik.kamet.Value
+
+internal class DirectNode(val value: Value) : ASTNode {
+	override fun codegen(context: Context): Value = value
+}
+
+@Suppress("NOTHING_TO_INLINE")
+internal inline fun Value.direct() = DirectNode(this)

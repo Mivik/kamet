@@ -27,17 +27,26 @@ internal class ParserTest {
 		val str = """
 			#[native] fun putchar(char: Int): Int
 			
-			fun foo(a: Int, b: Int): Int {
-				return a+b
+			struct A {
+				a: Int,
+				b: Int
 			}
 			
-			fun foo(a: Int): Int {
-				return a*a
+			fun edit(ptr: *A) {
+				val a = *ptr
+				a.a = 1
+			}
+			
+			fun edit(a: &A) {
+				a.b = 2
 			}
 			
 			#[native] fun main(): Int {
-				putchar(48+foo(1, 2))
-				putchar(48+foo(3))
+				var a: A
+				edit(&a)
+				edit(a)
+				putchar(48+a.a)
+				putchar(48+a.b)
 				return 0
 			}
 		""".trimIndent()
@@ -45,7 +54,7 @@ internal class ParserTest {
 		val context = Context.topLevel("test")
 		val node = parser.parse()
 		node.codegen(context)
-		if (true) {
+		if (false) {
 			val pass = LLVM.LLVMCreatePassManager()
 			LLVM.LLVMAddConstantPropagationPass(pass)
 			LLVM.LLVMAddInstructionCombiningPass(pass)

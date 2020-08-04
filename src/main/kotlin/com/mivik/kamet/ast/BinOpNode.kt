@@ -6,6 +6,7 @@ import com.mivik.kamet.IllegalCastException
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
+import com.mivik.kamet.reference
 import com.mivik.kamet.unreachable
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.global.LLVM.*
@@ -73,10 +74,37 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 			}
 			BinOp.Assign -> {
 				val lhs = lhs.codegen(context)
-				val rhs = rhs.codegen(context).dereference(context)
+				val rhs = rhs.codegen(context)
 				require(lhs is ValueRef && !lhs.isConst) { "Assigning to a non-reference type: ${lhs.type}" }
-				lhs.set(context, rhs)
+				if (lhs.type == rhs.type) lhs.set(context, rhs)
+				else {
+					val actual = rhs.dereference(context)
+					require(lhs.originalType == actual.type) { "Assigning a ${actual.type} to ${lhs.originalType}" }
+					lhs.set(context, actual)
+				}
 				lhs
+			}
+			BinOp.AccessMember -> {
+				require(rhs is ValueNode) { "Expected a member name, got $rhs" }
+				val lhs = lhs.codegen(context)
+				val type = lhs.type
+				// TODO extension
+				if (type is Type.Struct) {
+					val addr = context.declareVariable("struct_store", lhs)
+					val index = type.memberIndex(rhs.name)
+					Value(
+						LLVMBuildStructGEP(context.builder, addr.llvm, index, "access_member"),
+						type.memberType(index).reference(true)
+					)
+				} else {
+					val originalType = (type as Type.Reference).originalType as Type.Struct
+					val index = originalType.memberIndex(rhs.name)
+					ValueRef(
+						LLVMBuildStructGEP(context.builder, lhs.llvm, index, "access_member"),
+						originalType.memberType(index),
+						type.isConst
+					)
+				}
 			}
 			else -> codegen(
 				context,

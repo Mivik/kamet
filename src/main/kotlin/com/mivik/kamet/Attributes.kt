@@ -1,7 +1,7 @@
 package com.mivik.kamet
 
 enum class Attribute {
-	ALWAYS_INLINE, NATIVE;
+	PACKED, NATIVE;
 
 	companion object {
 		private val attributeMap by lazy {
@@ -11,9 +11,10 @@ enum class Attribute {
 		}
 
 		fun lookup(name: String): Attribute? = attributeMap[name]
-
-		val empty = emptySet<Attribute>()
 	}
+
+	@Suppress("NOTHING_TO_INLINE")
+	inline fun notApplicableTo(what: String): Nothing = error("Attribute \"$this\" is not applicable to $what")
 }
 
 typealias Attributes = Set<Attribute>

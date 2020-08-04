@@ -10,5 +10,3 @@ internal interface ASTNode {
 	val returned: Boolean
 		get() = false
 }
-
-internal abstract class AttributedNode(val attributes: Attributes): ASTNode

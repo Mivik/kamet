@@ -19,7 +19,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 				if (!arguments[i].type.isSubtypeOf(parameterTypes[i])) continue@loop
 			return function
 		}
-		error("No matching function for call to \"name\"")
+		error("No matching function for call to \"$name\"")
 	}
 
 	override fun codegen(context: Context): Value {
@@ -35,7 +35,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 					CastManager.cast(arguments[it], parameterTypes[it]).llvm
 				}),
 				arguments.size,
-				"${name}_result"
+				if (type.returnType == Type.Unit) "" else "${name}_result"
 			), type.returnType
 		)
 	}

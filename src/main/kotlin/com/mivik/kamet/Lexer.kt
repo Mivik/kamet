@@ -20,8 +20,8 @@ internal sealed class Token {
 	object Var : Token()
 	object LeftParenthesis : Token()
 	object RightParenthesis : Token()
-	object LeftBracket: Token()
-	object RightBracket: Token()
+	object LeftBracket : Token()
+	object RightBracket : Token()
 	object LeftBrace : Token()
 	object RightBrace : Token()
 	object Colon : Token()
@@ -34,7 +34,8 @@ internal sealed class Token {
 	object Do : Token()
 	object Const : Token()
 	object Newline : Token()
-	object NumberSign: Token()
+	object NumberSign : Token()
+	object Struct : Token()
 
 	class Identifier(val name: String) : Token() {
 		override fun toString(): String = "Identifier($name)"
@@ -79,6 +80,7 @@ internal open class BinOp(val symbol: String, val precedence: Int, val returnBoo
 	object BitwiseOr : BinOp("|", 3)
 	object Xor : BinOp("^", 4)
 	object Assign : BinOp("=", 0)
+	object AccessMember : BinOp(".", 11)
 
 	open class AssignOperators(val originalOp: BinOp) : BinOp(originalOp.symbol + "=", 0)
 	object PlusAssign : AssignOperators(Plus)
@@ -98,7 +100,7 @@ private enum class State : LexerState {
 }
 
 private enum class Action : LexerAction {
-	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE,
+	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT,
 	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN
 }
@@ -114,13 +116,14 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"<<=" action Action.SHIFT_LEFT_ASSIGN
 				">>=" action Action.SHIFT_RIGHT_ASSIGN
 				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--" action Action.DOUBLE_CHAR_OPERATOR
-				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,=~!#\\[\\]]" action Action.SINGLE_CHAR_OPERATOR
+				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,=~!#\\[\\]\\.]" action Action.SINGLE_CHAR_OPERATOR
 				"val" action Action.VAL
 				"var" action Action.VAR
 				"fun" action Action.FUNCTION
 				"return" action Action.RETURN
 				"while" action Action.WHILE
 				"const" action Action.CONST
+				"struct" action Action.STRUCT
 				"do" action Action.DO
 				"if" action Action.IF
 				"else" action Action.ELSE
@@ -158,6 +161,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.WHILE -> returnValue(Token.While)
 			Action.DO -> returnValue(Token.Do)
 			Action.CONST -> returnValue(Token.Const)
+			Action.STRUCT -> returnValue(Token.Struct)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))
 			Action.UNSIGNED_INT_LITERAL ->
@@ -217,6 +221,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					'~' -> UnaryOp.Inverse
 					'!' -> UnaryOp.Not
 					'#' -> Token.NumberSign
+					'.' -> BinOp.AccessMember
 					else -> unreachable()
 				}
 			)
