@@ -116,6 +116,8 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			object Float : Real("Float", 32, LLVM.LLVMFloatType())
 			object Double : Real("Double", 64, LLVM.LLVMDoubleType())
 		}
+
+		override fun isSubtypeOf(other: Type): kotlin.Boolean = other is Primitive
 	}
 
 	class Reference(val originalType: Type, val isConst: Boolean) :

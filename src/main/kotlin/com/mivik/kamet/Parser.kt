@@ -11,6 +11,7 @@ import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.InvocationNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
+import com.mivik.kamet.ast.SizeOfNode
 import com.mivik.kamet.ast.StructNode
 import com.mivik.kamet.ast.TopLevelNode
 import com.mivik.kamet.ast.UnaryOpNode
@@ -135,6 +136,7 @@ internal class Parser(private val lexer: Lexer) {
 			BinOp.Minus -> UnaryOpNode(UnaryOp.Negative, takePrimary())
 			BinOp.Multiply -> UnaryOpNode(UnaryOp.Indirection, takePrimary())
 			BinOp.BitwiseAnd -> UnaryOpNode(UnaryOp.AddressOf, takePrimary())
+			Token.SizeOf -> SizeOfNode(takeType())
 			else -> unexpected(token)
 		}
 

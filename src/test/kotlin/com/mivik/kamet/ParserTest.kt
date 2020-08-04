@@ -52,8 +52,10 @@ internal class ParserTest {
 				edit(evil)
 				val mutable_a: &A = *evil // mutable reference of "a"
 				edit(mutable_a)
+				val size: Int = sizeof(A) as Int
 				putchar(48+a.a)
 				putchar(48+a.b)
+				putchar(48+size)
 				return 0
 			}
 		""".trimIndent()
