@@ -40,13 +40,18 @@ internal class ParserTest {
 			fun edit(ptr: *A) {
 				val a = *ptr
 				a.a = 1
+			}
+			
+			fun edit(a: &A) {
 				a.b = 2
 			}
 			
 			#[native] fun main(): Int {
-				const var a: A // const var means a can be taken address of but cannot be modified
-				val evil = &a as (*A)
+				const var a: A // const var means "a" can be taken address of but cannot be modified
+				val evil = &a as (*A) // pointer cast!
 				edit(evil)
+				val mutable_a: &A = *evil // mutable reference of "a"
+				edit(mutable_a)
 				putchar(48+a.a)
 				putchar(48+a.b)
 				return 0
