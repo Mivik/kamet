@@ -1,33 +1,44 @@
 package com.mivik.kamet.ast
 
+import com.mivik.kamet.CastManager
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.global.LLVM
 
-internal class InvocationNode(val functionName: String, val elements: List<ASTNode>) : ASTNode {
+internal class InvocationNode(val name: String, val elements: List<ASTNode>) : ASTNode {
+	fun findMatchingFunction(context: Context, arguments: List<Value>): Value {
+		val functions = context.lookupFunctions(name)
+		if (functions.isEmpty()) error("No function named \"$name\"")
+		loop@ for (function in functions) {
+			val type = function.type as Type.Function
+			val parameterTypes = type.parameterTypes
+			if (arguments.size != parameterTypes.size) continue
+			for (i in elements.indices)
+				if (!arguments[i].type.isSubtypeOf(parameterTypes[i])) continue@loop
+			return function
+		}
+		error("No matching function for call to \"name\"")
+	}
+
 	override fun codegen(context: Context): Value {
-		// TODO polymorphism
-		val function = context.lookupValue(functionName).dereference(context)
-		val functionType = function.type
-		if (functionType !is Type.Function) error("Attempt to invoke non-function $functionName: ${function.type}")
-		val parameterTypes = functionType.parameterTypes
-		if (elements.size != parameterTypes.size) error("Expected ${parameterTypes.size} arguments for function $functionName, got ${elements.size}")
 		val arguments = elements.map { it.codegen(context) }
-		for (i in arguments.indices)
-			if (!arguments[i].type.isSubtypeOf(parameterTypes[i]))
-				error("Expected ${parameterTypes[i]}, got ${arguments[i].type}, at no.${i + 1} parameter of the function $functionName")
+		val function = findMatchingFunction(context, arguments)
+		val type = function.type as Type.Function
+		val parameterTypes = type.parameterTypes
 		return Value(
 			LLVM.LLVMBuildCall(
 				context.builder,
 				function.llvm,
-				PointerPointer(*Array(arguments.size) { arguments[it].llvm }),
+				PointerPointer(*Array(arguments.size) {
+					CastManager.cast(arguments[it], parameterTypes[it]).llvm
+				}),
 				arguments.size,
-				"${functionName}_result"
-			), functionType.returnType
+				"${name}_result"
+			), type.returnType
 		)
 	}
 
-	override fun toString(): String = "$functionName(${elements.joinToString(", ")})"
+	override fun toString(): String = "$name(${elements.joinToString(", ")})"
 }

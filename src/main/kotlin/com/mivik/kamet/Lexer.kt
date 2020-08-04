@@ -20,6 +20,8 @@ internal sealed class Token {
 	object Var : Token()
 	object LeftParenthesis : Token()
 	object RightParenthesis : Token()
+	object LeftBracket: Token()
+	object RightBracket: Token()
 	object LeftBrace : Token()
 	object RightBrace : Token()
 	object Colon : Token()
@@ -32,6 +34,7 @@ internal sealed class Token {
 	object Do : Token()
 	object Const : Token()
 	object Newline : Token()
+	object NumberSign: Token()
 
 	class Identifier(val name: String) : Token() {
 		override fun toString(): String = "Identifier($name)"
@@ -111,7 +114,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"<<=" action Action.SHIFT_LEFT_ASSIGN
 				">>=" action Action.SHIFT_RIGHT_ASSIGN
 				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--" action Action.DOUBLE_CHAR_OPERATOR
-				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,=~!]" action Action.SINGLE_CHAR_OPERATOR
+				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,=~!#\\[\\]]" action Action.SINGLE_CHAR_OPERATOR
 				"val" action Action.VAL
 				"var" action Action.VAR
 				"fun" action Action.FUNCTION
@@ -203,18 +206,20 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					'<' -> BinOp.Less
 					'%' -> BinOp.Reminder
 					'=' -> BinOp.Assign
-					'{' -> Token.LeftBrace
-					'}' -> Token.RightBrace
 					'(' -> Token.LeftParenthesis
 					')' -> Token.RightParenthesis
+					'[' -> Token.LeftBracket
+					']' -> Token.RightBracket
+					'{' -> Token.LeftBrace
+					'}' -> Token.RightBrace
 					':' -> Token.Colon
 					',' -> Token.Comma
 					'~' -> UnaryOp.Inverse
 					'!' -> UnaryOp.Not
+					'#' -> Token.NumberSign
 					else -> unreachable()
 				}
 			)
-
 			Action.ENTER_STRING -> switchState(State.IN_STRING)
 			Action.UNICODE_CHAR -> stringContent.append(chars.substring(lastMatch + 2, index).toShort(16).toChar())
 			Action.ESCAPE_CHAR ->

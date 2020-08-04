@@ -1,5 +1,6 @@
 package com.mivik.kamet
 
+import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kot.escape
 import org.bytedeco.llvm.LLVM.LLVMBasicBlockRef
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
@@ -13,7 +14,8 @@ class Context(
 	val builder: LLVMBuilderRef,
 	val currentFunction: Value?,
 	private val valueMap: MutableMap<String, Value>,
-	private val typeMap: MutableMap<String, Type>
+	private val typeMap: MutableMap<String, Type>,
+	private val functionMap: MutableMap<String, MutableList<Value>>
 ) {
 	companion object {
 		fun topLevel(moduleName: String): Context =
@@ -23,7 +25,8 @@ class Context(
 				LLVM.LLVMCreateBuilder(),
 				null,
 				mutableMapOf(),
-				Type.defaultTypeMap()
+				Type.defaultTypeMap(),
+				mutableMapOf()
 			)
 	}
 
@@ -57,7 +60,7 @@ class Context(
 	}
 
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
-		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf())
+		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
 
 	@Suppress("NOTHING_TO_INLINE")
 	inline fun setBlock(block: LLVMBasicBlockRef) {
@@ -76,5 +79,18 @@ class Context(
 		declare(name, ret)
 		if (LLVM.LLVMIsUndef(value.llvm) == 0) ret.set(this, value)
 		return ret
+	}
+
+	internal fun declareFunction(prototype: PrototypeNode, value: Value) {
+		declare(prototype.functionName, value)
+		functionMap.getOrPut(prototype.name) { mutableListOf() } += value
+	}
+
+	internal fun lookupFunctions(name: String): List<Value> {
+		var current = this
+		while (true) {
+			current.functionMap[name]?.let { return it }
+			current = current.parent ?: return emptyList()
+		}
 	}
 }

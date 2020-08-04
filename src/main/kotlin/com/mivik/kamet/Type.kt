@@ -31,7 +31,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			}
 	}
 
-	override fun toString(): String = javaClass.simpleName
+	override fun toString(): String = name
 
 	open fun isSubtypeOf(other: Type): Boolean {
 		if (this == other) return true
@@ -53,7 +53,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	class Function(val returnType: Type, val parameterTypes: List<Type>) : Type(
 		buildString {
 			append('(')
-			append(parameterTypes.joinToString(", ") { it.name })
+			append(parameterTypes.joinToString(", "))
 			append(") -> ")
 			append(returnType.name)
 		},
@@ -104,7 +104,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	}
 
 	class Reference(val originalType: Type, val isConst: Boolean) :
-		Type("&${if (isConst) "const " else ""}(${originalType.name})", originalType.llvm.pointer()) {
+		Type("&${if (isConst) "const " else ""}($originalType)", originalType.llvm.pointer()) {
 		init {
 			require(originalType !is Reference) { "Creating a reference of a reference" }
 		}
@@ -123,7 +123,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	}
 
 	class Pointer(val originalType: Type, val isConst: Boolean) :
-		Type("*${if (isConst) "const " else ""}(${originalType.name})", originalType.llvm.pointer()) {
+		Type("*${if (isConst) "const " else ""}($originalType)", originalType.llvm.pointer()) {
 		init {
 			require(originalType !is Reference) { "Creating a pointer to a reference" }
 		}

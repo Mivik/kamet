@@ -9,7 +9,7 @@ internal class FunctionNode(
 	val body: BlockNode
 ) : ASTNode {
 	override fun codegen(context: Context): Value {
-		if (context.hasValue(prototype.name)) error("Redeclare of ${prototype.name}")
+		if (context.hasValue(prototype.functionName)) error("Redeclare of ${prototype.functionName}")
 		val function = prototype.codegen(context)
 		LLVM.LLVMGetNamedFunction(context.module, prototype.name)
 		LLVM.LLVMPositionBuilderAtEnd(context.builder, LLVM.LLVMAppendBasicBlock(function.llvm, "entry"))

@@ -22,6 +22,7 @@ internal class Parser(private val lexer: Lexer) {
 	constructor(chars: CharSequence) : this(Lexer(chars))
 
 	private val readBuffer = LinkedList<Token>()
+	private var lastAttribute: Attributes? = null
 
 	private fun take(): Token =
 		if (readBuffer.isEmpty()) lexer.lex()
@@ -57,6 +58,8 @@ internal class Parser(private val lexer: Lexer) {
 		trim()
 		return take()
 	}
+
+	private fun consumeAttrs(): Attributes = (lastAttribute ?: emptySet()).also { lastAttribute = null }
 
 	private fun unexpected(token: Token): Nothing = error("Unexpected $token")
 
@@ -212,6 +215,7 @@ internal class Parser(private val lexer: Lexer) {
 
 	fun takePrototype(): PrototypeNode {
 		trim()
+		take().expect<Token.Function>()
 		val name = (take() as Token.Identifier).name
 		val args = mutableListOf<Pair<String, TypeDescriptor>>()
 		take().expect<Token.LeftParenthesis>()
@@ -227,24 +231,39 @@ internal class Parser(private val lexer: Lexer) {
 		else take()
 		return if (peek() == Token.Colon) {
 			take()
-			PrototypeNode(name, takeType(), args)
-		} else PrototypeNode(name, Type.Unit.asDescriptor(), args)
+			PrototypeNode(consumeAttrs(), name, takeType(), args)
+		} else PrototypeNode(consumeAttrs(), name, Type.Unit.asDescriptor(), args)
 	}
 
-	fun takeFunctionOrPrototype(): ASTNode {
-		take().expect<Token.Function>()
+	@Suppress("NOTHING_TO_INLINE")
+	inline fun takeFunctionOrPrototype(): ASTNode {
 		val prototype = takePrototype()
 		return if (peek() is Token.LeftBrace) FunctionNode(prototype, takeBlock())
 		else prototype
 	}
 
+	private fun takeAttributes(): Attributes {
+		take().expect<Token.NumberSign>()
+		take().expect<Token.LeftBracket>()
+		return if (peek() != Token.RightBracket) {
+			val set = mutableSetOf<Attribute>()
+			while (true) {
+				val name = (take() as Token.Identifier).name
+				set.add(Attribute.lookup(name) ?: error("Unknown attribute \"$name\""))
+				if (peek() == Token.RightBracket) break
+			}
+			take()
+			set
+		} else emptySet()
+	}
+
 	fun parse(): TopLevelNode {
 		val list = mutableListOf<ASTNode>()
 		while (true) {
-			trim()
-			when (peek()) {
+			when (trimAndPeek()) {
 				is Token.Function -> list += takeFunctionOrPrototype()
 				Token.EOF -> return TopLevelNode(list)
+				Token.NumberSign -> lastAttribute = takeAttributes()
 				else -> TODO()
 			}
 		}

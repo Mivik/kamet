@@ -25,13 +25,19 @@ internal class ParserTest {
 	@Test
 	fun test() {
 		val str = """
-			fun putchar(char: Int): Int
+			#[native] fun putchar(char: Int): Int
 			
-			fun main(): Int {
-				var i = 0
-				val ref = &i
-				*ref = 5
-				putchar(48+*ref)
+			fun foo(a: Int, b: Int): Int {
+				return a+b
+			}
+			
+			fun foo(a: Int): Int {
+				return a*a
+			}
+			
+			#[native] fun main(): Int {
+				putchar(48+foo(1, 2))
+				putchar(48+foo(3))
 				return 0
 			}
 		""".trimIndent()

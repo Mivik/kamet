@@ -1,5 +1,6 @@
 package com.mivik.kamet.ast
 
+import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 
@@ -9,3 +10,5 @@ internal interface ASTNode {
 	val returned: Boolean
 		get() = false
 }
+
+internal abstract class AttributedNode(val attributes: Attributes): ASTNode
