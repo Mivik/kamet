@@ -82,6 +82,7 @@ internal open class BinOp(val symbol: String, val precedence: Int, val returnBoo
 	object Xor : BinOp("^", 4)
 	object Assign : BinOp("=", 0)
 	object AccessMember : BinOp(".", 11)
+	object As : BinOp("as", 11)
 
 	open class AssignOperators(val originalOp: BinOp) : BinOp(originalOp.symbol + "=", 0)
 	object PlusAssign : AssignOperators(Plus)
@@ -101,7 +102,7 @@ private enum class State : LexerState {
 }
 
 private enum class Action : LexerAction {
-	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL,
+	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS,
 	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN
 }
@@ -113,6 +114,8 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			options.minimize = true
 			state(default) {
 				"[ \t]+".ignore()
+				"//[^\r\n]*".ignore()
+				"/\\*.+\\*/".ignore()
 				"\r|\n|\r\n" action Action.NEWLINE
 				"<<=" action Action.SHIFT_LEFT_ASSIGN
 				">>=" action Action.SHIFT_RIGHT_ASSIGN
@@ -127,6 +130,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"struct" action Action.STRUCT
 				"null" action Action.NULL
 				"do" action Action.DO
+				"as" action Action.AS
 				"if" action Action.IF
 				"else" action Action.ELSE
 				"true|false" action Action.BOOLEAN_LITERAL
@@ -164,6 +168,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.DO -> returnValue(Token.Do)
 			Action.CONST -> returnValue(Token.Const)
 			Action.STRUCT -> returnValue(Token.Struct)
+			Action.AS -> returnValue(BinOp.As)
 			Action.NULL -> returnValue(Token.Null)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))

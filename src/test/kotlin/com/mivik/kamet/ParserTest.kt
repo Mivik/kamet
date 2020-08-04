@@ -27,6 +27,11 @@ internal class ParserTest {
 		val str = """
 			#[native] fun putchar(char: Int): Int
 			
+			/**
+			 * Some multiline comment
+			 * Try Kamet!
+			 **/
+			
 			struct A {
 				a: Int,
 				b: Int
@@ -35,17 +40,13 @@ internal class ParserTest {
 			fun edit(ptr: *A) {
 				val a = *ptr
 				a.a = 1
-			}
-			
-			fun edit(a: &A) {
 				a.b = 2
 			}
 			
 			#[native] fun main(): Int {
-				var a: A
-				edit(&a)
-				edit(a)
-				val b: *A = null
+				const var a: A // const var means a can be taken address of but cannot be modified
+				val evil = &a as (*A)
+				edit(evil)
 				putchar(48+a.a)
 				putchar(48+a.b)
 				return 0

@@ -4,6 +4,7 @@ import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
+import com.mivik.kamet.ast.CastNode
 import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.IfNode
@@ -86,11 +87,14 @@ internal class Parser(private val lexer: Lexer) {
 			val currentPrecedence = precedenceOf(current)
 			if (currentPrecedence <= precedence) return currentLHS
 			take()
-			var rhs = takePrimary()
-			val nextPrecedence = precedenceOf(peek())
-			if (currentPrecedence < nextPrecedence)
-				rhs = takeBinOp(currentPrecedence, rhs)
-			currentLHS = BinOpNode(currentLHS, rhs, current as BinOp)
+			if (current == BinOp.As) currentLHS = CastNode(currentLHS, takeType())
+			else {
+				var rhs = takePrimary()
+				val nextPrecedence = precedenceOf(peek())
+				if (currentPrecedence < nextPrecedence)
+					rhs = takeBinOp(currentPrecedence, rhs)
+				currentLHS = BinOpNode(currentLHS, rhs, current as BinOp)
+			}
 		}
 	}
 

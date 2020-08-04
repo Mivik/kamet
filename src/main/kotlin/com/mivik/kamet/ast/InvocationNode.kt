@@ -42,7 +42,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 				context.builder,
 				function.llvm,
 				PointerPointer(*Array(arguments.size) {
-					CastManager.cast(context, arguments[it], parameterTypes[it]).llvm
+					CastManager.implicitCast(context, arguments[it], parameterTypes[it]).llvm
 				}),
 				arguments.size,
 				if (type.returnType == Type.Unit) "" else "${name}_result"
