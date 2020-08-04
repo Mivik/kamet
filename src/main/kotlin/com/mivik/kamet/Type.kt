@@ -51,12 +51,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	object Unit : Type("Unit", LLVM.LLVMVoidType())
 
 	class Function(val returnType: Type, val parameterTypes: List<Type>) : Type(
-		buildString {
-			append('(')
-			append(parameterTypes.joinToString(", "))
-			append(") -> ")
-			append(returnType.name)
-		},
+		"$returnType(${parameterTypes.joinToString(", ")})",
 		LLVM.LLVMFunctionType(
 			returnType.llvm,
 			PointerPointer(*Array(parameterTypes.size) { parameterTypes[it].llvm }),
@@ -164,3 +159,4 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 
 fun Type.reference(isConst: Boolean = false): Type = Type.Reference(this, isConst)
 fun Type.pointer(isConst: Boolean = false): Type = Type.Pointer(this, isConst)
+fun Type.nullPointer(): Value = pointer().let { Value(LLVM.LLVMConstNull(it.llvm), it) }

@@ -45,6 +45,7 @@ internal class ParserTest {
 				var a: A
 				edit(&a)
 				edit(a)
+				val b: *A = null
 				putchar(48+a.a)
 				putchar(48+a.b)
 				return 0

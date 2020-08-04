@@ -8,18 +8,28 @@ import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.global.LLVM
 
 internal class InvocationNode(val name: String, val elements: List<ASTNode>) : ASTNode {
-	fun findMatchingFunction(context: Context, arguments: List<Value>): Value {
+	@Suppress("NOTHING_TO_INLINE")
+	inline fun findMatchingFunction(context: Context, arguments: List<Value>): Value {
 		val functions = context.lookupFunctions(name)
 		if (functions.isEmpty()) error("No function named \"$name\"")
+		var ret: Value? = null
 		loop@ for (function in functions) {
 			val type = function.type as Type.Function
 			val parameterTypes = type.parameterTypes
 			if (arguments.size != parameterTypes.size) continue
 			for (i in elements.indices)
 				if (!arguments[i].type.isSubtypeOf(parameterTypes[i])) continue@loop
-			return function
+			ret.let {
+				if (it == null) ret = function
+				else error(
+					"Ambiguous call to function \"$name\": ${function.type} and ${it.type} are all applicable to arguments (${arguments.joinToString(
+						", "
+					) { it.type.name }})"
+				)
+			}
 		}
-		error("No matching function for call to \"$name\"")
+		return ret
+			?: error("No matching function for call to \"$name\" with argument types: (${arguments.joinToString(", ") { it.type.name }})")
 	}
 
 	override fun codegen(context: Context): Value {
@@ -32,7 +42,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 				context.builder,
 				function.llvm,
 				PointerPointer(*Array(arguments.size) {
-					CastManager.cast(arguments[it], parameterTypes[it]).llvm
+					CastManager.cast(context, arguments[it], parameterTypes[it]).llvm
 				}),
 				arguments.size,
 				if (type.returnType == Type.Unit) "" else "${name}_result"

@@ -21,7 +21,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 				return ValueRef(value.llvm, type.originalType, type.isConst)
 			}
 			UnaryOp.AddressOf -> {
-				require(value is ValueRef) { "Taking the address of a non-reference type: ${value.type}" }
+				require(value is ValueRef) { "Taking the address of a val: ${value.type}" }
 				val type = value.type as Type.Reference
 				return Value(value.llvm, type.originalType.pointer(type.isConst))
 			}

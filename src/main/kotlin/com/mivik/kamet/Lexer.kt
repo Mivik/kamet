@@ -36,6 +36,7 @@ internal sealed class Token {
 	object Newline : Token()
 	object NumberSign : Token()
 	object Struct : Token()
+	object Null : Token()
 
 	class Identifier(val name: String) : Token() {
 		override fun toString(): String = "Identifier($name)"
@@ -100,7 +101,7 @@ private enum class State : LexerState {
 }
 
 private enum class Action : LexerAction {
-	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT,
+	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL,
 	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN
 }
@@ -124,6 +125,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"while" action Action.WHILE
 				"const" action Action.CONST
 				"struct" action Action.STRUCT
+				"null" action Action.NULL
 				"do" action Action.DO
 				"if" action Action.IF
 				"else" action Action.ELSE
@@ -162,6 +164,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.DO -> returnValue(Token.Do)
 			Action.CONST -> returnValue(Token.Const)
 			Action.STRUCT -> returnValue(Token.Struct)
+			Action.NULL -> returnValue(Token.Null)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))
 			Action.UNSIGNED_INT_LITERAL ->

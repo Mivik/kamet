@@ -72,13 +72,13 @@ class Context(
 		LLVM.LLVMPositionBuilderAtEnd(builder, block)
 	}
 
-	fun declareVariable(name: String, value: Value): ValueRef {
+	fun declareVariable(name: String, value: Value, isConst: Boolean = false): ValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
 		val entryBlock = LLVM.LLVMGetEntryBasicBlock(function)
 		val tmpBuilder = LLVM.LLVMCreateBuilder()
 		LLVM.LLVMPositionBuilder(tmpBuilder, entryBlock, LLVM.LLVMGetFirstInstruction(entryBlock))
 		val address = LLVM.LLVMBuildAlloca(tmpBuilder, value.type.llvm, name)
-		val ret = ValueRef(address, value.type, false)
+		val ret = ValueRef(address, value.type, isConst)
 		LLVM.LLVMSetValueName2(address, name, name.length.toLong())
 		LLVM.LLVMDisposeBuilder(tmpBuilder)
 		declare(name, ret)
@@ -87,6 +87,14 @@ class Context(
 	}
 
 	internal fun declareFunction(prototype: PrototypeNode, value: Value) {
+		val parameterTypes = (value.type as Type.Function).parameterTypes
+		findDuplicate@ for (function in lookupFunctions(prototype.name)) {
+			val type = function.type as Type.Function
+			if (parameterTypes.size != type.parameterTypes.size) continue
+			for (i in parameterTypes.indices)
+				if (parameterTypes[i] != type.parameterTypes[i]) continue@findDuplicate
+			error("Function ${prototype.name} redeclared with same parameter types: (${parameterTypes.joinToString(", ")})")
+		}
 		declare(prototype.functionName, value)
 		functionMap.getOrPut(prototype.name) { mutableListOf() } += value
 	}

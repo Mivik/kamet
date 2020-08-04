@@ -96,6 +96,7 @@ internal class Parser(private val lexer: Lexer) {
 
 	private fun takePrimary(): ASTNode =
 		when (val token = trimAndTake()) {
+			is Token.Null -> Type.Nothing.nullPointer().direct()
 			is Token.Identifier ->
 				if (peek() == Token.LeftParenthesis) {
 					take()
@@ -151,24 +152,34 @@ internal class Parser(private val lexer: Lexer) {
 				take()
 				// TODO better error output for stuff like this (should output "Expected xxx, got xxx" instead of throwing an cast error)
 				val name = (take() as Token.Identifier).name
+				var type: TypeDescriptor? = null
+				if (peek() == Token.Colon) {
+					take()
+					type = takeType()
+				}
 				if (peek() == BinOp.Assign) {
 					take()
-					ValDeclareNode(name, takeExpr())
-				} else {
-					take().expect<Token.Colon>()
-					ValDeclareNode(name, UndefNode(takeType()))
-				}
+					ValDeclareNode(name, type, takeExpr())
+				} else ValDeclareNode(name, null, UndefNode(type!!))
 			}
-			Token.Var -> {
+			Token.Const, Token.Var -> {
+				val isConst =
+					if (peek() == Token.Const) {
+						take()
+						trimAndPeek().expect<Token.Var>()
+						true
+					} else false
 				take()
 				val name = (take() as Token.Identifier).name
+				var type: TypeDescriptor? = null
+				if (peek() == Token.Colon) {
+					take()
+					type = takeType()
+				}
 				if (peek() == BinOp.Assign) {
 					take()
-					VarDeclareNode(name, takeExpr())
-				} else {
-					take().expect<Token.Colon>()
-					VarDeclareNode(name, UndefNode(takeType()))
-				}
+					VarDeclareNode(name, type, takeExpr(), isConst)
+				} else VarDeclareNode(name, null, UndefNode(type!!), isConst)
 			}
 			Token.Return -> {
 				take()
@@ -227,7 +238,21 @@ internal class Parser(private val lexer: Lexer) {
 				TypeDescriptor.Pointer(takeType(), isConst)
 			}
 			Token.LeftParenthesis -> takeType().also { trimAndTake().expect<Token.RightParenthesis>() }
-			is Token.Identifier -> TypeDescriptor.Named(token.name)
+			is Token.Identifier -> {
+				val type = TypeDescriptor.Named(token.name)
+				if (peek() == Token.LeftParenthesis) {
+					take()
+					val parameterTypes = mutableListOf<TypeDescriptor>()
+					if (peek() != Token.RightParenthesis)
+						while (true) {
+							parameterTypes += takeType()
+							val splitter = trimAndTake()
+							if (splitter == Token.RightParenthesis) break
+							else splitter.expect<Token.Comma>()
+						}
+					TypeDescriptor.Function(type, parameterTypes)
+				} else type
+			}
 			else -> unreachable()
 		}
 

@@ -1,9 +1,12 @@
 package com.mivik.kamet
 
+import org.bytedeco.llvm.global.LLVM
+
 internal object CastManager {
-	fun cast(from: Value, to: Type): Value {
+	fun cast(context: Context, from: Value, to: Type): Value {
 		if (from.type == to) return from
-		if (!from.type.isSubtypeOf(to)) error("Attempt to cast a ${from.type} to $to")
-		return Value(from.llvm, to)
+		if (from.type is Type.Pointer && from.type.originalType == Type.Nothing && to is Type.Pointer)
+			return Value(LLVM.LLVMBuildBitCast(context.builder, from.llvm, to.llvm, "pointer_cast"), to)
+		error("Attempt to cast a ${from.type} to $to")
 	}
 }
