@@ -46,7 +46,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 					CastManager.implicitCast(context, arguments[it], parameterTypes[it]).llvm
 				}),
 				arguments.size,
-				if (type.returnType == Type.Unit) "" else "${name}_result"
+				if (type.returnType.canImplicitlyCastTo(Type.Unit)) "" else "${name}_result"
 			), type.returnType
 		)
 	}

@@ -8,11 +8,11 @@ internal object CastManager {
 				(from is Type.Pointer && from.originalType == Type.Nothing && to is Type.Pointer) ||
 				(from is Type.Reference && canImplicitlyCast(from.originalType, to))
 
-	private fun basicCast(context: Context, from: Value, to: Type): Value? {
+	private fun implicitCastOrNull(context: Context, from: Value, to: Type): Value? {
 		if (from.type == to) return from
 		if (from.type is Type.Pointer && from.type.originalType == Type.Nothing && to is Type.Pointer)
 			return Value(LLVM.LLVMBuildBitCast(context.builder, from.llvm, to.llvm, "pointer_cast"), to)
-		if (from.type is Type.Reference) basicCast(context, from.dereference(context), to)?.let { return it }
+		if (from.type is Type.Reference) implicitCastOrNull(context, from.dereference(context), to)?.let { return it }
 		return null
 	}
 
@@ -20,14 +20,19 @@ internal object CastManager {
 	inline fun fail(from: Value, to: Type): Nothing = error("Attempt to cast a ${from.type} to $to")
 
 	fun implicitCast(context: Context, from: Value, to: Type): Value {
-		basicCast(context, from, to)?.let { return it }
+		implicitCastOrNull(context, from, to)?.let { return it }
 		fail(from, to)
 	}
 
-	fun explicitCast(context: Context, from: Value, to: Type): Value {
-		basicCast(context, from, to)?.let { return it }
+	fun explicitCastOrNull(context: Context, from: Value, to: Type): Value? {
+		implicitCastOrNull(context, from, to)?.let { return it }
 		if (from.type is Type.Pointer && to is Type.Pointer)
 			return Value(LLVM.LLVMBuildBitCast(context.builder, from.llvm, to.llvm, "pointer_cast"), to)
+		if (from.type is Type.Reference) return explicitCastOrNull(
+			context,
+			from.dereference(context),
+			to
+		)?.let { return it }
 		if (from.type is Type.Primitive && to is Type.Primitive)
 			return Value(
 				LLVM.LLVMBuildCast(
@@ -69,6 +74,11 @@ internal object CastManager {
 					}, from.llvm, to.llvm, "primitive_cast"
 				), to
 			)
+		return null
+	}
+
+	fun explicitCast(context: Context, from: Value, to: Type): Value {
+		explicitCastOrNull(context, from, to)?.let { return it }
 		fail(from, to)
 	}
 }

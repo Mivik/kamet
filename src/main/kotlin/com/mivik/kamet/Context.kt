@@ -2,6 +2,8 @@ package com.mivik.kamet
 
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kot.escape
+import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.Pointer
 import org.bytedeco.llvm.LLVM.LLVMBasicBlockRef
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.LLVM.LLVMModuleRef
@@ -74,7 +76,7 @@ class Context(
 		}
 
 	fun declareVariable(name: String, value: Value, isConst: Boolean = false): ValueRef {
-		if (value.type == Type.Unit) return UnitValueRef(isConst)
+		if (value.type.canImplicitlyCastTo(Type.Unit)) return UnitValueRef(isConst)
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
 		val entryBlock = LLVM.LLVMGetEntryBasicBlock(function)
 		val tmpBuilder = LLVM.LLVMCreateBuilder()
@@ -107,5 +109,26 @@ class Context(
 			current.functionMap[name]?.let { return it }
 			current = current.parent ?: return emptyList()
 		}
+	}
+
+	fun runDefaultPass(): Context = apply {
+		val pass = LLVM.LLVMCreatePassManager()
+		LLVM.LLVMAddConstantPropagationPass(pass)
+		LLVM.LLVMAddInstructionCombiningPass(pass)
+		LLVM.LLVMAddReassociatePass(pass)
+		LLVM.LLVMAddGVNPass(pass)
+		LLVM.LLVMAddCFGSimplificationPass(pass)
+		LLVM.LLVMRunPassManager(pass, module)
+		LLVM.LLVMDisposePassManager(pass)
+	}
+
+	/**
+	 * @return Null if the module passed the verification, and otherwise the error message.
+	 */
+	fun verify(): String? {
+		val error = BytePointer(null as Pointer?)
+		val ret = LLVM.LLVMVerifyModule(module, LLVM.LLVMReturnStatusAction, error)
+		return if (ret == 1) error.settle()
+		else null
 	}
 }

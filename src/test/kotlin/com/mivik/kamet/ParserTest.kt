@@ -1,86 +1,104 @@
 package com.mivik.kamet
 
-import org.bytedeco.javacpp.BytePointer
-import org.bytedeco.javacpp.Pointer
+import com.mivik.kamet.ast.BlockNode
+import com.mivik.kamet.ast.FunctionNode
+import com.mivik.kamet.ast.PrototypeNode
+import com.mivik.kamet.ast.ReturnNode
+import com.mivik.kamet.ast.direct
 import org.bytedeco.llvm.global.LLVM
+import org.kiot.automaton.regexp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 internal class ParserTest {
-	private fun String.evaluate(context: Context = Context.topLevel("evaluate")): Value =
+	private fun String.parse(context: Context = Context.topLevel("evaluate")): Value =
 		Parser(this).takeExpr().codegen(context)
+
+	private fun String.evaluate(): GenericValue =
+		Context.topLevel("evaluate").let {
+			val functionName = "eval"
+			val parser = Parser(this)
+			val expr = parser.takeExpr().codegen(it)
+			FunctionNode(
+				PrototypeNode(setOf(Attribute.NATIVE), functionName, expr.type.asDescriptor(), emptyList()),
+				BlockNode().apply {
+					elements += ReturnNode(expr.direct())
+				}).codegen(it)
+			it.verify()?.let { msg -> error("Verification failed: $msg") }
+			val engine = JITEngine(it)
+			val result = engine.run(functionName)
+			engine.dispose()
+			result
+		}
+
+	private fun String.compile(): JITEngine =
+		Context.topLevel("evaluate").let {
+			Parser(this).parse().codegen(it)
+			it.verify()?.let { msg -> error("Verification failed: $msg") }
+			JITEngine(it)
+		}
+
+	private fun String.runFunction(functionName: String, argument: GenericValue? = null): GenericValue =
+		Context.topLevel("evaluate").let {
+			val engine = compile()
+			val result =
+				if (argument == null) engine.run(functionName)
+				else engine.run(functionName, argument)
+			engine.dispose()
+			result
+		}
 
 	@Test
 	fun testUnsigned() {
 		assertEquals(
-			Type.Primitive.Integer.UInt,
-			"1U+2*500".evaluate().type
+			1001,
+			"1U+2*500".evaluate().int
+		)
+		assertEquals(
+			3L,
+			"1+2UL".evaluate().long
 		)
 		assertEquals(
 			Type.Primitive.Integer.ULong,
-			"1+2UL".evaluate().type
+			"18446744073709551615UL".parse().type // (2^64)-1
 		)
 	}
 
 	@Test
-	fun test() {
-		val str = """
-			#[native] fun putchar(char: Int): Int
-			
-			/**
-			 * Some multiline comment
-			 * Try Kamet!
-			 **/
-			
-			fun _print(x: Long) {
-				if (x==0) return
-				else {
-					_print(x/10)
-					putchar(('0'+(x%10)) as Int)
+	fun testFIB() {
+		val engine = """
+			#[native] fun fib(x: Int): Int {
+				if (x<=2) return 1
+				var a = 1
+				var b = 1
+				var c = 2
+				var x = x-2
+				while (x!=0) {
+					c = a+b
+					a = b
+					b = c
+					x = x-1
 				}
+				return c
 			}
 			
-			fun print(x: Long) {
-				if (x==0) putchar('0' as Int)
-				else if (x<0) {
-					putchar('-' as Int)
-					_print(-x)
-				} else _print(x)
-				putchar('\n' as Int)
-			}
-			
-			fun quick_pow(x: Long, p: Long, mod: Long): Long {
-				var x = x
-				var p = p
-				var ret = 1 as Long
-				x %= mod
-				p %= mod-1
-				while (p!=0) {
-					if ((p&1)==1) ret *= x
-					x *= x
-					p >>= 1
-				}
-				return ret
-			}
-
 			#[native] fun main(): Int {
-				print(quick_pow(2L, 5L, 998244353L))
-				return 0
+				return fib(3)
 			}
-		""".trimIndent()
-		val parser = Parser(str)
-		val context = Context.topLevel("test")
-		val node = parser.parse()
-		node.codegen(context)
-		val error = BytePointer(null as Pointer?)
-		LLVM.LLVMVerifyModule(context.module, LLVM.LLVMPrintMessageAction, error)
-		if (true) {
-			val pass = LLVM.LLVMCreatePassManager()
-			LLVM.LLVMAddConstantPropagationPass(pass)
-			LLVM.LLVMAddInstructionCombiningPass(pass)
-			LLVM.LLVMAddReassociatePass(pass)
-			LLVM.LLVMRunPassManager(pass, context.module)
-		}
-		LLVM.LLVMDumpModule(context.module)
+		""".trimIndent().compile()
+		val func = engine.findFunction("fib")
+		assertEquals(
+			1,
+			engine.run(func, GenericValue(1)).int
+		)
+		assertEquals(
+			1,
+			engine.run(func, GenericValue(2)).int
+		)
+		assertEquals(
+			55,
+			engine.run(func, GenericValue(10)).int
+		)
+		engine.dispose()
 	}
 }

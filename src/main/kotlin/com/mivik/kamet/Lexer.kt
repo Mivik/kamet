@@ -111,7 +111,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			state(default) {
 				"[ \t]+".ignore()
 				"//[^\r\n]*".ignore()
-				"/\\*.+\\*/".ignore()
+				"/\\*([^*]|(\\*+[^*/]))*\\*+/".ignore()
 				"\r|\n|\r\n" action Action.NEWLINE
 				"<<=" action Action.SHIFT_LEFT_ASSIGN
 				">>=" action Action.SHIFT_RIGHT_ASSIGN

@@ -6,6 +6,7 @@ import com.mivik.kamet.IllegalCastException
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
+import com.mivik.kamet.implicitCast
 import com.mivik.kamet.reference
 import com.mivik.kamet.unreachable
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
@@ -76,12 +77,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 				val lhs = lhs.codegen(context)
 				val rhs = rhs.codegen(context)
 				require(lhs is ValueRef && !lhs.isConst) { "Assigning to a non-reference type: ${lhs.type}" }
-				if (lhs.type == rhs.type) lhs.set(context, rhs)
-				else {
-					val actual = rhs.dereference(context)
-					require(lhs.originalType == actual.type) { "Assigning a ${actual.type} to ${lhs.originalType}" }
-					lhs.set(context, actual)
-				}
+				lhs.set(context, rhs.dereference(context).implicitCast(context, lhs.originalType))
 				lhs
 			}
 			BinOp.AccessMember -> {
