@@ -67,12 +67,14 @@ class Context(
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
 		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
 
-	@Suppress("NOTHING_TO_INLINE")
-	inline fun setBlock(block: LLVMBasicBlockRef) {
-		LLVM.LLVMPositionBuilderAtEnd(builder, block)
-	}
+	inline var block: LLVMBasicBlockRef
+		get() = LLVM.LLVMGetInsertBlock(builder)
+		set(block) {
+			LLVM.LLVMPositionBuilderAtEnd(builder, block)
+		}
 
 	fun declareVariable(name: String, value: Value, isConst: Boolean = false): ValueRef {
+		if (value.type == Type.Unit) return UnitValueRef(isConst)
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
 		val entryBlock = LLVM.LLVMGetEntryBasicBlock(function)
 		val tmpBuilder = LLVM.LLVMCreateBuilder()

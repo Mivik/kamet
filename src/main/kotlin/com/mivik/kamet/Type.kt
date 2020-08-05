@@ -7,7 +7,6 @@ import org.bytedeco.llvm.global.LLVM
 sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	companion object {
 		val defaultTypes = arrayOf(
-			Any,
 			Nothing,
 			Unit,
 			Primitive.Boolean,
@@ -33,20 +32,8 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 
 	override fun toString(): String = name
 
-	open fun isSubtypeOf(other: Type): Boolean {
-		if (this == other) return true
-		return when (this) {
-			Nothing -> true
-			else -> false
-		}
-	}
-
-	@Suppress("NOTHING_TO_INLINE")
-	inline fun isSuperTypeOf(other: Type): Boolean = other.isSubtypeOf(this)
-
 	fun undefined(): Value = Value(LLVM.LLVMGetUndef(llvm), this)
 
-	object Any : Type("Any", LLVM.LLVMVoidType())
 	object Nothing : Type("Nothing", LLVM.LLVMVoidType())
 	object Unit : Type("Unit", LLVM.LLVMVoidType())
 
@@ -59,7 +46,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			0
 		)
 	) {
-		override fun equals(other: kotlin.Any?): Boolean =
+		override fun equals(other: Any?): Boolean =
 			if (other is Function) returnType == other.returnType && parameterTypes == other.parameterTypes
 			else false
 
@@ -68,11 +55,6 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			result = 31 * result + parameterTypes.hashCode()
 			return result
 		}
-
-		override fun isSubtypeOf(other: Type): Boolean =
-			if (other is Function)
-				returnType.isSubtypeOf(other.returnType) && parameterTypes == other.parameterTypes
-			else super.isSubtypeOf(other)
 	}
 
 	class Struct(name: String, val elements: List<Pair<String, Type>>, packed: Boolean) :
@@ -116,8 +98,6 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			object Float : Real("Float", 32, LLVM.LLVMFloatType())
 			object Double : Real("Double", 64, LLVM.LLVMDoubleType())
 		}
-
-		override fun isSubtypeOf(other: Type): kotlin.Boolean = other is Primitive
 	}
 
 	class Reference(val originalType: Type, val isConst: Boolean) :
@@ -126,12 +106,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			require(originalType !is Reference) { "Creating a reference of a reference" }
 		}
 
-		override fun isSubtypeOf(other: Type): Boolean =
-			if (other is Reference)
-				(isConst <= other.isConst) && originalType.isSubtypeOf(other.originalType)
-			else super.isSubtypeOf(other)
-
-		override fun equals(other: kotlin.Any?): Boolean =
+		override fun equals(other: Any?): Boolean =
 			if (other is Reference)
 				isConst == other.isConst && originalType == other.originalType
 			else false
@@ -145,12 +120,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			require(originalType !is Reference) { "Creating a pointer to a reference" }
 		}
 
-		override fun isSubtypeOf(other: Type): Boolean =
-			if (other is Pointer)
-				(isConst <= other.isConst) && originalType.isSubtypeOf(other.originalType)
-			else super.isSubtypeOf(other)
-
-		override fun equals(other: kotlin.Any?): Boolean =
+		override fun equals(other: Any?): Boolean =
 			if (other is Pointer)
 				isConst == other.isConst && originalType == other.originalType
 			else false

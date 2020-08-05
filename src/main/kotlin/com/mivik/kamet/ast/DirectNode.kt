@@ -5,6 +5,8 @@ import com.mivik.kamet.Value
 
 internal class DirectNode(val value: Value) : ASTNode {
 	override fun codegen(context: Context): Value = value
+
+	override fun toString(): String = value.toString()
 }
 
 @Suppress("NOTHING_TO_INLINE")

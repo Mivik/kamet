@@ -9,38 +9,40 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 		val builder = context.builder
 		val conditionValue = condition.codegen(context)
 		val function = context.llvmFunction
-		val llvmThenBlock = LLVM.LLVMAppendBasicBlock(function, "then")
-		val llvmElseBlock = LLVM.LLVMAppendBasicBlock(function, "else")
+		var llvmThenBlock = LLVM.LLVMAppendBasicBlock(function, "then")
+		var llvmElseBlock = LLVM.LLVMAppendBasicBlock(function, "else")
 		if (elseBlock == null) {
 			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, llvmThenBlock, llvmElseBlock)
-			context.setBlock(llvmThenBlock)
+			context.block = llvmThenBlock
 			thenBlock.codegen(context)
 			if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, llvmElseBlock)
-			context.setBlock(llvmElseBlock)
+			context.block = llvmElseBlock
 			return Value.Nothing
 		} else {
 			val llvmFinalBlock = LLVM.LLVMAppendBasicBlock(function, "final")
 			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, llvmThenBlock, llvmElseBlock)
-			context.setBlock(llvmThenBlock)
+			context.block = llvmThenBlock
 			val thenRet = thenBlock.codegen(context)
-			context.setBlock(llvmElseBlock)
+			llvmThenBlock = context.block
+			context.block = llvmElseBlock
 			val elseRet = elseBlock.codegen(context)
+			llvmElseBlock = context.block
 			return if (thenRet.type == elseRet.type) {
 				val variable = context.declareVariable("if_result", thenRet.type.undefined())
-				context.setBlock(llvmThenBlock)
+				context.block = llvmThenBlock
 				variable.set(context, thenRet)
 				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				context.setBlock(llvmElseBlock)
+				context.block = llvmElseBlock
 				variable.set(context, elseRet)
 				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				context.setBlock(llvmFinalBlock)
+				context.block = llvmFinalBlock
 				variable.dereference(context)
 			} else {
-				context.setBlock(llvmThenBlock)
+				context.block = llvmThenBlock
 				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				context.setBlock(llvmElseBlock)
+				context.block = llvmElseBlock
 				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, llvmFinalBlock)
-				context.setBlock(llvmFinalBlock)
+				context.block = llvmFinalBlock
 				Value.Nothing
 			}
 		}

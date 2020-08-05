@@ -126,7 +126,7 @@ internal class Parser(private val lexer: Lexer) {
 				val condition = takeExpr()
 				take().expect<Token.RightParenthesis>()
 				val thenBlock = takeBlockOrStmt()
-				if (peek() == Token.Else) {
+				if (trimAndPeek() == Token.Else) {
 					take()
 					IfNode(condition, thenBlock, takeBlockOrStmt())
 				} else IfNode(condition, thenBlock)

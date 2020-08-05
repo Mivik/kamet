@@ -8,10 +8,7 @@ import org.bytedeco.llvm.global.LLVM
 
 private fun convert(context: Context, value: Value, expected: TypeDescriptor? = null): Value {
 	val type = expected?.translate(context)
-	type?.let {
-		require(value.type.isSubtypeOf(it)) { "Expected $expected, got a ${value.type}" }
-		return CastManager.implicitCast(context, value, type)
-	}
+	type?.let { return CastManager.implicitCast(context, value, type) }
 	return value
 }
 

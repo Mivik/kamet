@@ -32,30 +32,39 @@ internal class ParserTest {
 			 * Try Kamet!
 			 **/
 			
-			struct A {
-				a: Int,
-				b: Int
+			fun _print(x: Long) {
+				if (x==0) return
+				else {
+					_print(x/10)
+					putchar(48+((x%10) as Int))
+				}
 			}
 			
-			fun edit(ptr: *A) {
-				val a = *ptr
-				a.a = 1
+			fun print(x: Long) {
+				if (x==0) putchar(48)
+				else if (x<0) {
+					putchar(45)
+					_print(-x)
+				} else _print(x)
+				putchar(10)
 			}
 			
-			fun edit(a: &A) {
-				a.b = 2
+			fun quick_pow(x: Long, p: Long, mod: Long): Long {
+				var x = x
+				var p = p
+				var ret = 1 as Long
+				x %= mod
+				p %= mod-1
+				while (p!=0) {
+					if ((p&1)==1) ret *= x
+					x *= x
+					p >>= 1
+				}
+				return ret
 			}
-			
+
 			#[native] fun main(): Int {
-				const var a: A // const var means "a" can be taken address of but cannot be modified
-				val evil = &a as (*A) // pointer cast!
-				edit(evil)
-				val mutable_a: &A = *evil // mutable reference of "a"
-				edit(mutable_a)
-				val size: Int = sizeof(A) as Int
-				putchar(48+a.a)
-				putchar(48+a.b)
-				putchar(48+size)
+				print(quick_pow(2L, 5L, 998244353L))
 				return 0
 			}
 		""".trimIndent()
@@ -63,15 +72,15 @@ internal class ParserTest {
 		val context = Context.topLevel("test")
 		val node = parser.parse()
 		node.codegen(context)
-		if (false) {
+		val error = BytePointer(null as Pointer?)
+		LLVM.LLVMVerifyModule(context.module, LLVM.LLVMPrintMessageAction, error)
+		if (true) {
 			val pass = LLVM.LLVMCreatePassManager()
 			LLVM.LLVMAddConstantPropagationPass(pass)
 			LLVM.LLVMAddInstructionCombiningPass(pass)
 			LLVM.LLVMAddReassociatePass(pass)
 			LLVM.LLVMRunPassManager(pass, context.module)
 		}
-		val error = BytePointer(null as Pointer?)
-		LLVM.LLVMVerifyModule(context.module, LLVM.LLVMPrintMessageAction, error)
 		LLVM.LLVMDumpModule(context.module)
 	}
 }

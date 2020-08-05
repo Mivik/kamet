@@ -10,10 +10,10 @@ internal class DoWhileNode(val block: ASTNode, val condition: ASTNode) : ASTNode
 		val llvmWhileBlock = LLVM.LLVMAppendBasicBlock(function, "while")
 		val llvmFinalBlock = LLVM.LLVMAppendBasicBlock(function, "final")
 		LLVM.LLVMBuildBr(context.builder, llvmWhileBlock)
-		context.setBlock(llvmWhileBlock)
+		context.block = llvmWhileBlock
 		block.codegen(context)
 		LLVM.LLVMBuildCondBr(context.builder, condition.codegen(context).llvm, llvmWhileBlock, llvmFinalBlock)
-		context.setBlock(llvmFinalBlock)
+		context.block = llvmFinalBlock
 		return Value.Nothing
 	}
 

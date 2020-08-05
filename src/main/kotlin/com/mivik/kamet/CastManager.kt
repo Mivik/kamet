@@ -3,10 +3,16 @@ package com.mivik.kamet
 import org.bytedeco.llvm.global.LLVM
 
 internal object CastManager {
+	fun canImplicitlyCast(from: Type, to: Type): Boolean =
+		(from == to) ||
+				(from is Type.Pointer && from.originalType == Type.Nothing && to is Type.Pointer) ||
+				(from is Type.Reference && canImplicitlyCast(from.originalType, to))
+
 	private fun basicCast(context: Context, from: Value, to: Type): Value? {
 		if (from.type == to) return from
 		if (from.type is Type.Pointer && from.type.originalType == Type.Nothing && to is Type.Pointer)
 			return Value(LLVM.LLVMBuildBitCast(context.builder, from.llvm, to.llvm, "pointer_cast"), to)
+		if (from.type is Type.Reference) basicCast(context, from.dereference(context), to)?.let { return it }
 		return null
 	}
 
@@ -66,3 +72,9 @@ internal object CastManager {
 		fail(from, to)
 	}
 }
+
+@Suppress("NOTHING_TO_INLINE")
+internal inline fun Value.implicitCast(context: Context, to: Type) = CastManager.implicitCast(context, this, to)
+
+@Suppress("NOTHING_TO_INLINE")
+internal inline fun Type.canImplicitlyCastTo(to: Type) = CastManager.canImplicitlyCast(this, to)

@@ -4,6 +4,7 @@ import com.mivik.kamet.CastManager
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
+import com.mivik.kamet.canImplicitlyCastTo
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.global.LLVM
 
@@ -18,13 +19,13 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 			val parameterTypes = type.parameterTypes
 			if (arguments.size != parameterTypes.size) continue
 			for (i in elements.indices)
-				if (!arguments[i].type.isSubtypeOf(parameterTypes[i])) continue@loop
+				if (!arguments[i].type.canImplicitlyCastTo(parameterTypes[i])) continue@loop
 			ret.let {
 				if (it == null) ret = function
 				else error(
 					"Ambiguous call to function \"$name\": ${function.type} and ${it.type} are all applicable to arguments (${arguments.joinToString(
 						", "
-					) { it.type.name }})"
+					) { func -> func.type.name }})"
 				)
 			}
 		}
