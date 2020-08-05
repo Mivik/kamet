@@ -36,17 +36,17 @@ internal class ParserTest {
 				if (x==0) return
 				else {
 					_print(x/10)
-					putchar(48+((x%10) as Int))
+					putchar(('0'+(x%10)) as Int)
 				}
 			}
 			
 			fun print(x: Long) {
-				if (x==0) putchar(48)
+				if (x==0) putchar('0' as Int)
 				else if (x<0) {
-					putchar(45)
+					putchar('-' as Int)
 					_print(-x)
 				} else _print(x)
-				putchar(10)
+				putchar('\n' as Int)
 			}
 			
 			fun quick_pow(x: Long, p: Long, mod: Long): Long {

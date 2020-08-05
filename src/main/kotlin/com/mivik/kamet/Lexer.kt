@@ -6,11 +6,6 @@ import org.kiot.lexer.LexerAction
 import org.kiot.lexer.LexerData
 import org.kiot.lexer.LexerState
 
-private class IllegalEscapeException(private val char: Char) : IllegalArgumentException() {
-	override val message: String?
-		get() = "Illegal escape char: ${char.description()}"
-}
-
 internal sealed class Token {
 	override fun toString(): String = javaClass.simpleName
 
@@ -37,7 +32,7 @@ internal sealed class Token {
 	object NumberSign : Token()
 	object Struct : Token()
 	object Null : Token()
-	object SizeOf: Token()
+	object SizeOf : Token()
 
 	class Identifier(val name: String) : Token() {
 		override fun toString(): String = "Identifier($name)"
@@ -103,7 +98,7 @@ private enum class State : LexerState {
 }
 
 private enum class Action : LexerAction {
-	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF,
+	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL,
 	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN
 }
@@ -122,6 +117,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				">>=" action Action.SHIFT_RIGHT_ASSIGN
 				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--" action Action.DOUBLE_CHAR_OPERATOR
 				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,=~!#\\[\\]\\.]" action Action.SINGLE_CHAR_OPERATOR
+				"'(\\\\u[0-9a-fA-F]{4}|\\\\.|.)'" action Action.CHAR_LITERAL
 				"val" action Action.VAL
 				"var" action Action.VAR
 				"fun" action Action.FUNCTION
@@ -174,6 +170,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.NULL -> returnValue(Token.Null)
 			Action.SIZEOF -> returnValue(Token.SizeOf)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
+			Action.CHAR_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integer.Char))
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))
 			Action.UNSIGNED_INT_LITERAL ->
 				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integer.UInt))
@@ -238,21 +235,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			)
 			Action.ENTER_STRING -> switchState(State.IN_STRING)
 			Action.UNICODE_CHAR -> stringContent.append(chars.substring(lastMatch + 2, index).toShort(16).toChar())
-			Action.ESCAPE_CHAR ->
-				stringContent.append(
-					when (val char = chars[lastMatch + 1]) {
-						'\\' -> '\\'
-						'"' -> '"'
-						'n' -> '\n'
-						'r' -> '\r'
-						't' -> '\t'
-						'b' -> '\b'
-						'f' -> '\u000c'
-						'v' -> '\u000b'
-						'0' -> '\u0000'
-						else -> throw IllegalEscapeException(char)
-					}
-				)
+			Action.ESCAPE_CHAR -> stringContent.append(chars[lastMatch + 1].escape())
 			Action.PLAIN_TEXT -> stringContent.append(string())
 			Action.EXIT_STRING -> {
 				returnValue(Token.StringLiteral(stringContent.toString())) // not returning immediately
