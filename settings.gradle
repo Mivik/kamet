@@ -1,2 +1,9 @@
-rootProject.name = 'kamet'
+pluginManagement {
+	it.resolutionStrategy { it.eachPlugin {
+		if (it.requested.id.id == 'kotlin') {
+			it.useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:${it.requested.version}")
+		}
+	} }
+}
 
+rootProject.name = 'kamet'

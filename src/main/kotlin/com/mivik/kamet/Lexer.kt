@@ -1,6 +1,5 @@
 package com.mivik.kamet
 
-import com.mivik.kot.escape
 import org.kiot.lexer.Lexer
 import org.kiot.lexer.LexerAction
 import org.kiot.lexer.LexerData
@@ -58,21 +57,22 @@ internal sealed class UnaryOp(val symbol: String) : Token() {
 }
 
 internal open class BinOp(val symbol: String, val precedence: Int, val returnBoolean: Boolean = false) : Token() {
+	internal open class BooOp(symbol: String, precedence: Int): BinOp(symbol, precedence, true)
 	object Plus : BinOp("+", 9)
 	object Minus : BinOp("-", 9)
 	object Multiply : BinOp("*", 10)
 	object Divide : BinOp("/", 10)
 	object Reminder : BinOp("%", 10)
-	object Equal : BinOp("==", 6, true)
-	object NotEqual : BinOp("!=", 6, true)
-	object Less : BinOp("<", 7, true)
-	object LessOrEqual : BinOp("<=", 7, true)
-	object Greater : BinOp(">", 7, true)
-	object GreaterOrEqual : BinOp(">=", 7, true)
+	object Equal : BooOp("==", 6)
+	object NotEqual : BooOp("!=", 6)
+	object Less : BooOp("<", 7)
+	object LessOrEqual : BooOp("<=", 7)
+	object Greater : BooOp(">", 7)
+	object GreaterOrEqual : BooOp(">=", 7)
 	object ShiftLeft : BinOp("<<", 8)
 	object ShiftRight : BinOp(">>", 8)
-	object And : BinOp("&&", 2, true)
-	object Or : BinOp("||", 1, true)
+	object And : BooOp("&&", 2)
+	object Or : BooOp("||", 1)
 	object BitwiseAnd : BinOp("&", 5)
 	object BitwiseOr : BinOp("|", 3)
 	object Xor : BinOp("^", 4)
@@ -202,7 +202,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					"&=" -> BinOp.BitwiseAndAssign
 					"|=" -> BinOp.BitwiseOrAssign
 					"^=" -> BinOp.XorAssign
-					else -> unreachable()
+					else -> impossible()
 				}
 			)
 			Action.SINGLE_CHAR_OPERATOR -> returnValue(
@@ -230,7 +230,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					'!' -> UnaryOp.Not
 					'#' -> Token.NumberSign
 					'.' -> BinOp.AccessMember
-					else -> unreachable()
+					else -> impossible()
 				}
 			)
 			Action.ENTER_STRING -> switchState(State.IN_STRING)

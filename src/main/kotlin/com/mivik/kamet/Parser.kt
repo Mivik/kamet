@@ -43,7 +43,7 @@ internal class Parser(private val lexer: Lexer) {
 	}
 
 	private inline fun <reified T> Token?.expect(): Token {
-		require(this is T) { "Expected ${T::class.simpleName}, got $this" }
+		require(this is T) { "Expected ${T::class.java.simpleName}, got $this" }
 		return this
 	}
 
@@ -259,7 +259,7 @@ internal class Parser(private val lexer: Lexer) {
 					TypeDescriptor.Function(type, parameterTypes)
 				} else type
 			}
-			else -> unreachable()
+			else -> impossible()
 		}
 
 	fun takePrototype(): PrototypeNode {

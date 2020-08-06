@@ -6,7 +6,7 @@ import com.mivik.kamet.UnaryOp
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
 import com.mivik.kamet.pointer
-import com.mivik.kamet.unreachable
+import com.mivik.kamet.impossible
 import org.bytedeco.llvm.global.LLVM
 
 internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boolean = false) : ASTNode {
@@ -29,26 +29,25 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 				require(value is ValueRef && !value.isConst) { "Increment on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
 				val ret = if (after) value.dereference(context) else value
-				value.set(
-					context, Value(
-						when (originalType) {
-							is Type.Primitive.Integer ->
-								LLVM.LLVMBuildAdd(
-									builder,
-									value.dereference(context).llvm,
-									LLVM.LLVMConstInt(originalType.llvm, 1L, 0),
-									"increment"
-								)
-							is Type.Primitive.Real ->
-								LLVM.LLVMBuildFAdd(
-									builder,
-									value.dereference(context).llvm,
-									LLVM.LLVMConstReal(originalType.llvm, 1.0),
-									"increment"
-								)
-							else -> unreachable()
-						}, originalType
-					)
+				value.setIn(context, Value(
+					when (originalType) {
+						is Type.Primitive.Integer ->
+							LLVM.LLVMBuildAdd(
+								builder,
+								value.dereference(context).llvm,
+								LLVM.LLVMConstInt(originalType.llvm, 1L, 0),
+								"increment"
+							)
+						is Type.Primitive.Real ->
+							LLVM.LLVMBuildFAdd(
+								builder,
+								value.dereference(context).llvm,
+								LLVM.LLVMConstReal(originalType.llvm, 1.0),
+								"increment"
+							)
+						else -> impossible()
+					}, originalType
+				)
 				)
 				return ret
 			}
@@ -56,26 +55,25 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 				require(value is ValueRef && !value.isConst) { "Decrement on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
 				val ret = if (after) value.dereference(context) else value
-				value.set(
-					context, Value(
-						when (originalType) {
-							is Type.Primitive.Integer ->
-								LLVM.LLVMBuildSub(
-									builder,
-									value.dereference(context).llvm,
-									LLVM.LLVMConstInt(originalType.llvm, 1L, 0),
-									"decrement"
-								)
-							is Type.Primitive.Real ->
-								LLVM.LLVMBuildFSub(
-									builder,
-									value.dereference(context).llvm,
-									LLVM.LLVMConstReal(originalType.llvm, 1.0),
-									"decrement"
-								)
-							else -> unreachable()
-						}, originalType
-					)
+				value.setIn(context, Value(
+					when (originalType) {
+						is Type.Primitive.Integer ->
+							LLVM.LLVMBuildSub(
+								builder,
+								value.dereference(context).llvm,
+								LLVM.LLVMConstInt(originalType.llvm, 1L, 0),
+								"decrement"
+							)
+						is Type.Primitive.Real ->
+							LLVM.LLVMBuildFSub(
+								builder,
+								value.dereference(context).llvm,
+								LLVM.LLVMConstReal(originalType.llvm, 1.0),
+								"decrement"
+							)
+						else -> impossible()
+					}, originalType
+				)
 				)
 				return ret
 			}
@@ -87,20 +85,20 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 				Type.Primitive.Boolean ->
 					when (op) {
 						UnaryOp.Not -> LLVM.LLVMBuildNot(builder, value.llvm, "not")
-						else -> unreachable()
+						else -> impossible()
 					}
 				is Type.Primitive.Integer ->
 					when (op) {
 						UnaryOp.Negative -> LLVM.LLVMBuildNeg(builder, value.llvm, "negative")
 						UnaryOp.Inverse -> LLVM.LLVMBuildNot(builder, value.llvm, "inverse")
-						else -> unreachable()
+						else -> impossible()
 					}
 				is Type.Primitive.Real ->
 					when (op) {
 						UnaryOp.Negative -> LLVM.LLVMBuildFNeg(builder, value.llvm, "negative")
-						else -> unreachable()
+						else -> impossible()
 					}
-				else -> unreachable()
+				else -> impossible()
 			}, value.type
 		)
 	}

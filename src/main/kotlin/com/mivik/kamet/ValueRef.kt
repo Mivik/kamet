@@ -5,7 +5,7 @@ import org.bytedeco.llvm.global.LLVM
 
 open class ValueRef(address: LLVMValueRef, val originalType: Type, val isConst: Boolean) :
 	Value(address, originalType.reference(isConst)) {
-	open fun set(context: Context, value: Value) {
+	open fun setIn(context: Context, value: Value) {
 		if (isConst) error("Attempt to alter a const reference")
 		LLVM.LLVMBuildStore(context.builder, value.llvm, llvm)
 	}
@@ -15,6 +15,6 @@ open class ValueRef(address: LLVMValueRef, val originalType: Type, val isConst: 
 }
 
 class UnitValueRef(isConst: Boolean) : ValueRef(Type.Unit.nullPointer().llvm, Type.Unit, isConst) {
-	override fun set(context: Context, value: Value) {}
+	override fun setIn(context: Context, value: Value) {}
 	override fun dereference(context: Context): Value = Unit
 }

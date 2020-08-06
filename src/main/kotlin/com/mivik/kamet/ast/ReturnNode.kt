@@ -18,6 +18,5 @@ internal class ReturnNode(val value: ASTNode) : ASTNode {
 
 	override fun toString(): String = "return $value"
 
-	override val returned: Boolean
-		get() = true
+	override val returned: Boolean get() = true
 }

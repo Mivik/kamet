@@ -12,10 +12,10 @@ private fun convert(context: Context, value: Value, expected: TypeDescriptor? = 
 	return value
 }
 
-internal class ValDeclareNode(val name: String, val expected: TypeDescriptor? = null, val defaultValue: ASTNode) :
+internal class ValDeclareNode(val name: String, val type: TypeDescriptor? = null, val defaultValue: ASTNode) :
 	ASTNode {
 	override fun codegen(context: Context): Value {
-		val value = convert(context, defaultValue.codegen(context), expected)
+		val value = convert(context, defaultValue.codegen(context), type)
 		context.declare(name, value)
 		LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
 		return Value.Nothing
@@ -26,12 +26,12 @@ internal class ValDeclareNode(val name: String, val expected: TypeDescriptor? = 
 
 internal class VarDeclareNode(
 	val name: String,
-	val expected: TypeDescriptor? = null,
+	val type: TypeDescriptor? = null,
 	val defaultValue: ASTNode,
 	val isConst: Boolean = false
 ) : ASTNode {
 	override fun codegen(context: Context): Value {
-		val value = convert(context, defaultValue.codegen(context), expected)
+		val value = convert(context, defaultValue.codegen(context), type)
 		context.declareVariable(name, value, isConst)
 		return Value.Nothing
 	}

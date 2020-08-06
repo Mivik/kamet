@@ -1,7 +1,7 @@
 package com.mivik.kamet
 
+import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.PrototypeNode
-import com.mivik.kot.escape
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.llvm.LLVM.LLVMBasicBlockRef
@@ -74,6 +74,10 @@ class Context(
 		set(block) {
 			LLVM.LLVMPositionBuilderAtEnd(builder, block)
 		}
+	internal fun codegenUsing(block: LLVMBasicBlockRef, node: ASTNode): Value {
+		this.block = block
+		return node.codegen(this)
+	}
 
 	fun declareVariable(name: String, value: Value, isConst: Boolean = false): ValueRef {
 		if (value.type.canImplicitlyCastTo(Type.Unit)) return UnitValueRef(isConst)
@@ -86,7 +90,7 @@ class Context(
 		LLVM.LLVMSetValueName2(address, name, name.length.toLong())
 		LLVM.LLVMDisposeBuilder(tmpBuilder)
 		declare(name, ret)
-		if (LLVM.LLVMIsUndef(value.llvm) == 0) ret.set(this, value)
+		if (LLVM.LLVMIsUndef(value.llvm) == 0) ret.setIn(this, value)
 		return ret
 	}
 
@@ -128,7 +132,7 @@ class Context(
 	fun verify(): String? {
 		val error = BytePointer(null as Pointer?)
 		val ret = LLVM.LLVMVerifyModule(module, LLVM.LLVMReturnStatusAction, error)
-		return if (ret == 1) error.settle()
+		return if (ret == 1) error.asErrorMessage()
 		else null
 	}
 }

@@ -9,18 +9,17 @@ internal class FunctionNode(
 	val body: BlockNode
 ) : ASTNode {
 	override fun codegen(context: Context): Value {
-		if (context.hasValue(prototype.functionName)) error("Redeclare of ${prototype.functionName}")
+		if (context.hasValue(prototype.functionName)) error("Redeclaration: ${prototype.functionName}")
 		val function = prototype.codegen(context)
 		LLVM.LLVMGetNamedFunction(context.module, prototype.name)
-		LLVM.LLVMPositionBuilderAtEnd(context.builder, LLVM.LLVMAppendBasicBlock(function.llvm, "entry"))
-		val subContext = context.subContext(function)
-		val parameters = prototype.parameters
-		for (i in parameters.indices)
-			subContext.declare(
-				parameters[i].first,
-				Value(LLVM.LLVMGetParam(function.llvm, i), parameters[i].second.translate(context))
-			)
-		body.codegen(subContext)
+		context.block = LLVM.LLVMAppendBasicBlock(function.llvm, "entry")
+		context.subContext(function).run {
+			for ((i, nt) in prototype.parameters.withIndex()) {
+				val (name, type) = nt
+				declare(name, Value(LLVM.LLVMGetParam(function.llvm, i), type.translate(context)))
+			}
+			body.codegen(this)
+		}
 		context.declare(prototype.name, function)
 		return function
 	}

@@ -129,6 +129,11 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	}
 }
 
+internal inline val Type.isReference get() = this is Type.Reference
+internal inline val Type.isPointer get() = this is Type.Pointer
+
+internal fun <T> Type.Primitive.Integer.foldSign(signed: T, unsigned: T) = if (this.signed) signed else unsigned
+
 fun Type.reference(isConst: Boolean = false): Type = Type.Reference(this, isConst)
 fun Type.pointer(isConst: Boolean = false): Type = Type.Pointer(this, isConst)
 fun Type.nullPointer(): Value = pointer().let { Value(LLVM.LLVMConstNull(it.llvm), it) }
