@@ -13,7 +13,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 		val functions =
 			context.lookupFunctions(name).takeUnless { it.isEmpty() } ?: error("No function named \"$name\"")
 		var found: Value? = null
-		val argStr = arguments.joinToString(", ") { it.type.name }
+		val argStr by lazy { arguments.joinToString(", ") { it.type.name } }
 		nextFunction@ for (function in functions) {
 			val type = function.type as Type.Function
 			val parameterTypes = type.parameterTypes
