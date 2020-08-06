@@ -9,10 +9,10 @@ import com.mivik.kamet.Value
 import org.bytedeco.llvm.global.LLVM
 
 internal class PrototypeNode(
-	attributes: Attributes,
-	val name: String,
-	val returnType: TypeDescriptor,
-	val parameters: List<Pair<String, TypeDescriptor>>
+		attributes: Attributes,
+		val name: String,
+		val returnType: TypeDescriptor,
+		val parameters: List<Pair<String, TypeDescriptor>>
 ) : ASTNode {
 	val mangled: String
 		get() = "$name(${parameters.joinToString(",") { "${it.second}" }}):$returnType"
@@ -33,8 +33,8 @@ internal class PrototypeNode(
 		context.lookupValueOrNull(functionName)?.let { return it }
 		val returnType = returnType.translate(context)
 		val functionType = Type.Function(
-			returnType,
-			parameters.map { it.second.translate(context) }
+				returnType,
+				parameters.map { it.second.translate(context) }
 		)
 		val function = LLVM.LLVMAddFunction(context.module, functionName, functionType.llvm)
 		for (i in parameters.indices) {
@@ -45,5 +45,5 @@ internal class PrototypeNode(
 	}
 
 	override fun toString(): String =
-		"fun $name(${parameters.joinToString(", ") { "${it.first}: ${it.second}" }}): $returnType"
+			"fun $name(${parameters.joinToString(", ") { "${it.first}: ${it.second}" }}): $returnType"
 }

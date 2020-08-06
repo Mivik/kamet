@@ -12,10 +12,10 @@ private inline fun fromLong(type: Type, value: Long, signed: Boolean = true) =
 
 class GenericValue(val llvm: LLVMGenericValueRef) {
 	constructor(value: Boolean) : this(fromLong(Primitive.Boolean, if (value) 1L else 0L, false))
-	constructor(value: Char) : this(fromLong(Primitive.Integer.Char, value.toLong()))
-	constructor(value: Short) : this(fromLong(Primitive.Integer.Short, value.toLong()))
-	constructor(value: Int) : this(fromLong(Primitive.Integer.Int, value.toLong()))
-	constructor(value: Long) : this(fromLong(Primitive.Integer.Long, value))
+	constructor(value: Char) : this(fromLong(Primitive.Integral.Char, value.toLong()))
+	constructor(value: Short) : this(fromLong(Primitive.Integral.Short, value.toLong()))
+	constructor(value: Int) : this(fromLong(Primitive.Integral.Int, value.toLong()))
+	constructor(value: Long) : this(fromLong(Primitive.Integral.Long, value))
 	constructor(value: Float) : this(LLVMCreateGenericValueOfFloat(Primitive.Real.Float.llvm, value.toDouble()))
 	constructor(value: Double) : this(LLVMCreateGenericValueOfFloat(Primitive.Real.Double.llvm, value))
 	constructor(value: Pointer) : this(LLVMCreateGenericValueOfPointer(value))

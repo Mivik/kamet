@@ -7,13 +7,13 @@ import org.bytedeco.llvm.global.LLVM
 internal class DoWhileNode(val block: ASTNode, val condition: ASTNode) : ASTNode {
 	override fun codegen(context: Context): Value {
 		val function = context.llvmFunction
-		val llvmWhileBlock = LLVM.LLVMAppendBasicBlock(function, "while")
-		val llvmFinalBlock = LLVM.LLVMAppendBasicBlock(function, "final")
-		LLVM.LLVMBuildBr(context.builder, llvmWhileBlock)
-		context.block = llvmWhileBlock
+		val whileBB = LLVM.LLVMAppendBasicBlock(function, "while")
+		val finalBB = LLVM.LLVMAppendBasicBlock(function, "final")
+		LLVM.LLVMBuildBr(context.builder, whileBB)
+		context.block = whileBB
 		block.codegen(context)
-		LLVM.LLVMBuildCondBr(context.builder, condition.codegen(context).llvm, llvmWhileBlock, llvmFinalBlock)
-		context.block = llvmFinalBlock
+		LLVM.LLVMBuildCondBr(context.builder, condition.codegen(context).llvm, whileBB, finalBB)
+		context.block = finalBB
 		return Value.Nothing
 	}
 

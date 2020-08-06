@@ -8,5 +8,5 @@ import org.bytedeco.llvm.global.LLVM
 
 internal class SizeOfNode(val type: TypeDescriptor) : ASTNode {
 	override fun codegen(context: Context): Value =
-		Value(LLVM.LLVMSizeOf(type.translate(context).llvm), Type.Primitive.Integer.ULong)
+		Value(LLVM.LLVMSizeOf(type.translate(context).dereference().llvm), Type.Primitive.Integral.ULong)
 }

@@ -42,11 +42,6 @@ internal class Parser(private val lexer: Lexer) {
 		readBuffer.offerFirst(token)
 	}
 
-	private inline fun <reified T> Token?.expect(): Token {
-		require(this is T) { "Expected ${T::class.java.simpleName}, got $this" }
-		return this
-	}
-
 	@Suppress("NOTHING_TO_INLINE")
 	private inline fun trim() {
 		while (peek() == Token.Newline) take()
@@ -94,7 +89,7 @@ internal class Parser(private val lexer: Lexer) {
 				val nextPrecedence = precedenceOf(peek())
 				if (currentPrecedence < nextPrecedence)
 					rhs = takeBinOp(currentPrecedence, rhs)
-				currentLHS = BinOpNode(currentLHS, rhs, current as BinOp)
+				currentLHS = BinOpNode(currentLHS, rhs, current.expect())
 			}
 		}
 	}
@@ -157,7 +152,7 @@ internal class Parser(private val lexer: Lexer) {
 			Token.Val -> {
 				take()
 				// TODO better error output for stuff like this (should output "Expected xxx, got xxx" instead of throwing an cast error)
-				val name = (take() as Token.Identifier).name
+				val name = take().expect<Token.Identifier>().name
 				var type: TypeDescriptor? = null
 				if (peek() == Token.Colon) {
 					take()
@@ -176,7 +171,7 @@ internal class Parser(private val lexer: Lexer) {
 						true
 					} else false
 				take()
-				val name = (take() as Token.Identifier).name
+				val name = take().expect<Token.Identifier>().name
 				var type: TypeDescriptor? = null
 				if (peek() == Token.Colon) {
 					take()
@@ -264,12 +259,12 @@ internal class Parser(private val lexer: Lexer) {
 
 	fun takePrototype(): PrototypeNode {
 		trimAndTake().expect<Token.Function>()
-		val name = (trimAndTake() as Token.Identifier).name
+		val name = trimAndTake().expect<Token.Identifier>().name
 		val args = mutableListOf<Pair<String, TypeDescriptor>>()
 		take().expect<Token.LeftParenthesis>()
 		if (trimAndPeek() != Token.RightParenthesis)
 			while (true) {
-				val argName = (trimAndTake() as Token.Identifier).name
+				val argName = trimAndTake().expect<Token.Identifier>().name
 				trimAndTake().expect<Token.Colon>()
 				args.add(Pair(argName, takeType()))
 				val splitter = trimAndTake()
@@ -298,7 +293,7 @@ internal class Parser(private val lexer: Lexer) {
 		return if (peek() != Token.RightBracket) {
 			val set = mutableSetOf<Attribute>()
 			while (true) {
-				val name = (take() as Token.Identifier).name
+				val name = take().expect<Token.Identifier>().name
 				set.add(Attribute.lookup(name) ?: error("Unknown attribute \"$name\""))
 				if (peek() == Token.RightBracket) break
 			}
@@ -309,12 +304,12 @@ internal class Parser(private val lexer: Lexer) {
 
 	fun takeStruct(): StructNode {
 		take().expect<Token.Struct>()
-		val name = (trimAndTake() as Token.Identifier).name
+		val name = trimAndTake().expect<Token.Identifier>().name
 		val elements = mutableListOf<Pair<String, TypeDescriptor>>()
 		trimAndTake().expect<Token.LeftBrace>()
 		if (trimAndPeek() != Token.RightBrace)
 			while (true) {
-				val elementName = (trimAndTake() as Token.Identifier).name
+				val elementName = trimAndTake().expect<Token.Identifier>().name
 				trimAndTake().expect<Token.Colon>()
 				elements.add(Pair(elementName, takeType()))
 				val splitter = trimAndTake()

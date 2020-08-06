@@ -14,7 +14,7 @@ internal class BlockNode : ASTNode {
 
 	override fun toString(): String =
 		if (elements.isEmpty()) "{}"
-		else "{\n${elements.joinToString("\n").split('\n').joinToString("\n") { '\t' + it }}\n}" // TODO why? join("\n").split('\n')
+		else "{\n${elements.joinToString("\n").split('\n').joinToString("\n") { '\t' + it }}\n}"
 
 	override val returned: Boolean
 		get() = elements.isNotEmpty() && elements.last().returned

@@ -10,15 +10,15 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			Nothing,
 			Unit,
 			Primitive.Boolean,
-			Primitive.Integer.Char,
-			Primitive.Integer.Byte,
-			Primitive.Integer.UByte,
-			Primitive.Integer.Short,
-			Primitive.Integer.UShort,
-			Primitive.Integer.Int,
-			Primitive.Integer.UInt,
-			Primitive.Integer.Long,
-			Primitive.Integer.ULong,
+			Primitive.Integral.Char,
+			Primitive.Integral.Byte,
+			Primitive.Integral.UByte,
+			Primitive.Integral.Short,
+			Primitive.Integral.UShort,
+			Primitive.Integral.Int,
+			Primitive.Integral.UInt,
+			Primitive.Integral.Long,
+			Primitive.Integral.ULong,
 			Primitive.Real.Float,
 			Primitive.Real.Double
 		)
@@ -31,6 +31,8 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	}
 
 	override fun toString(): String = name
+
+	open fun dereference(): Type = this
 
 	fun undefined(): Value = Value(LLVM.LLVMGetUndef(llvm), this)
 
@@ -80,18 +82,18 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	sealed class Primitive(name: String, val sizeInBits: Int, llvm: LLVMTypeRef) : Type(name, llvm) {
 		object Boolean : Primitive("Boolean", 1, LLVM.LLVMIntType(1))
 
-		sealed class Integer(name: String, sizeInBits: kotlin.Int, val signed: kotlin.Boolean) :
+		sealed class Integral(name: String, sizeInBits: kotlin.Int, val signed: kotlin.Boolean) :
 			Primitive(name, sizeInBits, LLVM.LLVMIntType(sizeInBits)) {
-			object Char : Integer("Char", 16, true)
+			object Char : Integral("Char", 16, true)
 
-			object Byte : Integer("Byte", 8, true)
-			object UByte : Integer("UByte", 8, false)
-			object Short : Integer("Short", 16, true)
-			object UShort : Integer("UShort", 16, false)
-			object Int : Integer("Int", 32, true)
-			object UInt : Integer("UInt", 32, false)
-			object Long : Integer("Long", 64, true)
-			object ULong : Integer("ULong", 64, false)
+			object Byte : Integral("Byte", 8, true)
+			object UByte : Integral("UByte", 8, false)
+			object Short : Integral("Short", 16, true)
+			object UShort : Integral("UShort", 16, false)
+			object Int : Integral("Int", 32, true)
+			object UInt : Integral("UInt", 32, false)
+			object Long : Integral("Long", 64, true)
+			object ULong : Integral("ULong", 64, false)
 		}
 
 		sealed class Real(name: String, sizeInBits: Int, llvm: LLVMTypeRef) : Primitive(name, sizeInBits, llvm) {
@@ -105,6 +107,8 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 		init {
 			require(originalType !is Reference) { "Creating a reference of a reference" }
 		}
+
+		override fun dereference(): Type = originalType
 
 		override fun equals(other: Any?): Boolean =
 			if (other is Reference)
@@ -132,8 +136,14 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 internal inline val Type.isReference get() = this is Type.Reference
 internal inline val Type.isPointer get() = this is Type.Pointer
 
-internal fun <T> Type.Primitive.Integer.foldSign(signed: T, unsigned: T) = if (this.signed) signed else unsigned
+@Suppress("NOTHING_TO_INLINE")
+internal inline fun <T> Type.Primitive.Integral.foldSign(signed: T, unsigned: T) = if (this.signed) signed else unsigned
 
-fun Type.reference(isConst: Boolean = false): Type = Type.Reference(this, isConst)
-fun Type.pointer(isConst: Boolean = false): Type = Type.Pointer(this, isConst)
-fun Type.nullPointer(): Value = pointer().let { Value(LLVM.LLVMConstNull(it.llvm), it) }
+@Suppress("NOTHING_TO_INLINE")
+inline fun Type.reference(isConst: Boolean = false): Type = Type.Reference(this, isConst)
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Type.pointer(isConst: Boolean = false): Type = Type.Pointer(this, isConst)
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Type.nullPointer(): Value = pointer().let { Value(LLVM.LLVMConstNull(it.llvm), it) }

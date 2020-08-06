@@ -13,8 +13,8 @@ internal class ConstantNode(val type: Type.Primitive, val value: String) : ASTNo
 
 	private fun makeLLVMConst(): LLVMValueRef {
 		return when (type) {
-			Type.Primitive.Integer.Char -> LLVM.LLVMConstInt(type.llvm, run {
-				val content = value.substring(1, value.length - 1) //'c'
+			Type.Primitive.Integral.Char -> LLVM.LLVMConstInt(type.llvm, run {
+				val content = value.substring(1, value.length - 1) // '[content]'
 				when {
 					content.startsWith("\\u") -> content.substring(2).toShort(16).toChar()
 					content[0] == '\\' -> content[1].escape()
@@ -22,7 +22,7 @@ internal class ConstantNode(val type: Type.Primitive, val value: String) : ASTNo
 				}.toLong()
 			}, 0)
 			is Type.Primitive.Boolean -> LLVM.LLVMConstInt(type.llvm, if (value == "true") 1 else 0, 0)
-			is Type.Primitive.Integer -> LLVM.LLVMConstInt(type.llvm, value.toLongIgnoringOverflow(), 0)
+			is Type.Primitive.Integral -> LLVM.LLVMConstInt(type.llvm, value.toLongIgnoringOverflow(), 0)
 			is Type.Primitive.Real -> LLVM.LLVMConstReal(type.llvm, value.toDouble())
 		}
 	}

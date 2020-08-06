@@ -7,8 +7,11 @@ import com.mivik.kamet.Type
 import com.mivik.kamet.TypeDescriptor
 import com.mivik.kamet.Value
 
-internal class StructNode(attributes: Attributes, val name: String, val elements: List<Pair<String, TypeDescriptor>>) :
-	ASTNode {
+internal class StructNode(
+	attributes: Attributes,
+	val name: String,
+	val elements: List<Pair<String, TypeDescriptor>>
+) : ASTNode {
 	val isPacked: Boolean
 
 	init {

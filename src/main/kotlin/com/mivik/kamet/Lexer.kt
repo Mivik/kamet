@@ -57,7 +57,7 @@ internal sealed class UnaryOp(val symbol: String) : Token() {
 }
 
 internal open class BinOp(val symbol: String, val precedence: Int, val returnBoolean: Boolean = false) : Token() {
-	internal open class BooOp(symbol: String, precedence: Int): BinOp(symbol, precedence, true)
+	internal open class BooOp(symbol: String, precedence: Int) : BinOp(symbol, precedence, true)
 	object Plus : BinOp("+", 9)
 	object Minus : BinOp("-", 9)
 	object Multiply : BinOp("*", 10)
@@ -170,15 +170,15 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.NULL -> returnValue(Token.Null)
 			Action.SIZEOF -> returnValue(Token.SizeOf)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
-			Action.CHAR_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integer.Char))
+			Action.CHAR_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integral.Char))
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))
 			Action.UNSIGNED_INT_LITERAL ->
-				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integer.UInt))
+				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integral.UInt))
 			Action.UNSIGNED_LONG_LITERAL ->
-				returnValue(Token.Constant(chars.substring(lastMatch, index - 2), Type.Primitive.Integer.ULong))
-			Action.INT_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integer.Int))
+				returnValue(Token.Constant(chars.substring(lastMatch, index - 2), Type.Primitive.Integral.ULong))
+			Action.INT_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integral.Int))
 			Action.LONG_LITERAL ->
-				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integer.Long))
+				returnValue(Token.Constant(chars.substring(lastMatch, index - 1), Type.Primitive.Integral.Long))
 			Action.BOOLEAN_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Boolean))
 			Action.SHIFT_LEFT_ASSIGN -> returnValue(BinOp.ShiftLeftAssign)
 			Action.SHIFT_RIGHT_ASSIGN -> returnValue(BinOp.ShiftRightAssign)

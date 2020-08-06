@@ -2,6 +2,7 @@ package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
 import com.mivik.kamet.Value
+import com.mivik.kamet.canImplicitlyCastTo
 import org.bytedeco.llvm.global.LLVM
 
 internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBlock: ASTNode? = null) : ASTNode {
@@ -17,14 +18,15 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 			if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, elseBB)
 			context.block = elseBB
 			return Value.Nothing
-		} else { //v value if-else
+		} else { // if-else
 			val mergeBB = LLVM.LLVMAppendBasicBlock(function, "final")
 			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, thenBB, elseBB)
 			val thenRet = context.codegenUsing(thenBB, thenBlock)
 			thenBB = context.block
 			val elseRet = context.codegenUsing(elseBB, elseBlock)
 			elseBB = context.block
-			return if (thenRet.type == elseRet.type) {
+			return if (thenRet.type == elseRet.type) { // when the whole if statement can be considered as a value
+				// TODO whether two types are equivalent is not equal to whether they are equal
 				val variable = context.declareVariable("if_result", thenRet.type.undefined())
 				context.block = thenBB
 				variable.setIn(context, thenRet)
@@ -34,7 +36,7 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, mergeBB)
 				context.block = mergeBB
 				variable.dereference(context)
-			} else { // fail (type mismatch)
+			} else { // this if is not a expression
 				context.block = thenBB
 				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, mergeBB)
 				context.block = elseBB

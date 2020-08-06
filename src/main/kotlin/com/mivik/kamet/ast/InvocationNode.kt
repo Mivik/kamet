@@ -10,7 +10,8 @@ import org.bytedeco.llvm.global.LLVM
 
 internal class InvocationNode(val name: String, val elements: List<ASTNode>) : ASTNode {
 	private fun findMatchingFunction(context: Context, arguments: List<Value>): Value {
-		val functions = context.lookupFunctions(name).takeUnless { it.isEmpty() } ?: error("No function named \"$name\"")
+		val functions =
+			context.lookupFunctions(name).takeUnless { it.isEmpty() } ?: error("No function named \"$name\"")
 		var found: Value? = null
 		val argStr = arguments.joinToString(", ") { it.type.name }
 		nextFunction@ for (function in functions) {
@@ -19,8 +20,8 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 			if (arguments.size != parameterTypes.size) continue
 			for (i in elements.indices)
 				if (!arguments[i].type.canImplicitlyCastTo(parameterTypes[i])) continue@nextFunction
-				if (found == null) found = function
-				else error("Ambiguous call to function \"$name\": ${function.type} and ${found.type} are both applicable to arguments ($argStr)")
+			if (found == null) found = function
+			else error("Ambiguous call to function \"$name\": ${function.type} and ${found.type} are both applicable to arguments ($argStr)")
 		}
 		return found ?: error("No matching function for call to \"$name\" with argument types: ($argStr)")
 	}

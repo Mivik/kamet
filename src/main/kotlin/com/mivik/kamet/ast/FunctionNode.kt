@@ -14,8 +14,8 @@ internal class FunctionNode(
 		LLVM.LLVMGetNamedFunction(context.module, prototype.name)
 		context.block = LLVM.LLVMAppendBasicBlock(function.llvm, "entry")
 		context.subContext(function).run {
-			for ((i, nt) in prototype.parameters.withIndex()) {
-				val (name, type) = nt
+			for ((i, parameter) in prototype.parameters.withIndex()) {
+				val (name, type) = parameter
 				declare(name, Value(LLVM.LLVMGetParam(function.llvm, i), type.translate(context)))
 			}
 			body.codegen(this)

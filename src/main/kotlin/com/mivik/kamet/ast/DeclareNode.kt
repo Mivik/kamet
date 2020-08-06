@@ -12,8 +12,7 @@ private fun convert(context: Context, value: Value, expected: TypeDescriptor? = 
 	return value
 }
 
-internal class ValDeclareNode(val name: String, val type: TypeDescriptor? = null, val defaultValue: ASTNode) :
-	ASTNode {
+internal class ValDeclareNode(val name: String, val type: TypeDescriptor? = null, val defaultValue: ASTNode) : ASTNode {
 	override fun codegen(context: Context): Value {
 		val value = convert(context, defaultValue.codegen(context), type)
 		context.declare(name, value)

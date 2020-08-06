@@ -5,8 +5,6 @@ import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
 import com.mivik.kamet.ast.direct
-import org.bytedeco.llvm.global.LLVM
-import org.kiot.automaton.regexp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -59,7 +57,7 @@ internal class ParserTest {
 			"1+2UL".evaluate().long
 		)
 		assertEquals(
-			Type.Primitive.Integer.ULong,
+			Type.Primitive.Integral.ULong,
 			"18446744073709551615UL".parse().type // (2^64)-1
 		)
 	}
@@ -80,10 +78,6 @@ internal class ParserTest {
 					x = x-1
 				}
 				return c
-			}
-			
-			#[native] fun main(): Int {
-				return fib(3)
 			}
 		""".trimIndent().compile()
 		val func = engine.findFunction("fib")

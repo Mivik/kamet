@@ -11,25 +11,25 @@ import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
 class Context(
-	val parent: Context?,
-	val module: LLVMModuleRef,
-	val builder: LLVMBuilderRef,
-	val currentFunction: Value?,
-	private val valueMap: MutableMap<String, Value>,
-	private val typeMap: MutableMap<String, Type>,
-	private val functionMap: MutableMap<String, MutableList<Value>>
+		val parent: Context?,
+		val module: LLVMModuleRef,
+		val builder: LLVMBuilderRef,
+		val currentFunction: Value?,
+		private val valueMap: MutableMap<String, Value>,
+		private val typeMap: MutableMap<String, Type>,
+		private val functionMap: MutableMap<String, MutableList<Value>>
 ) {
 	companion object {
 		fun topLevel(moduleName: String): Context =
-			Context(
-				null,
-				LLVM.LLVMModuleCreateWithName(moduleName),
-				LLVM.LLVMCreateBuilder(),
-				null,
-				mutableMapOf(),
-				Type.defaultTypeMap(),
-				mutableMapOf()
-			)
+				Context(
+						null,
+						LLVM.LLVMModuleCreateWithName(moduleName),
+						LLVM.LLVMCreateBuilder(),
+						null,
+						mutableMapOf(),
+						Type.defaultTypeMap(),
+						mutableMapOf()
+				)
 	}
 
 	val llvmFunction: LLVMValueRef
@@ -67,13 +67,14 @@ class Context(
 	}
 
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
-		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
+			Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
 
 	inline var block: LLVMBasicBlockRef
 		get() = LLVM.LLVMGetInsertBlock(builder)
 		set(block) {
 			LLVM.LLVMPositionBuilderAtEnd(builder, block)
 		}
+
 	internal fun codegenUsing(block: LLVMBasicBlockRef, node: ASTNode): Value {
 		this.block = block
 		return node.codegen(this)
@@ -127,12 +128,12 @@ class Context(
 	}
 
 	/**
-	 * @return Null if the module passed the verification, and otherwise the error message.
+	 * @return null if the module passed the verification, and otherwise the error message.
 	 */
 	fun verify(): String? {
 		val error = BytePointer(null as Pointer?)
 		val ret = LLVM.LLVMVerifyModule(module, LLVM.LLVMReturnStatusAction, error)
-		return if (ret == 1) error.asErrorMessage()
+		return if (ret == 1) error.toJava()
 		else null
 	}
 }

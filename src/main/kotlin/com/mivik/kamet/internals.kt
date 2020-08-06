@@ -5,6 +5,8 @@ import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.global.LLVM
 import java.lang.IllegalStateException
 import java.lang.StringBuilder
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 internal fun Char.description(): String = "$this (0x${toShort().toString(16)})" //'a' (0x61)
 
@@ -32,7 +34,7 @@ internal fun String.escape(): String = fold(StringBuilder()) { sb, c ->
 }.toString()
 
 internal fun String.toLongIgnoringOverflow(): Long {
-	//drop((if (first() == '-') 1 else 0)).fold(0L) { acc, c -> acc*10 + (c-'0') }
+	// drop((if (first() == '-') 1 else 0)).fold(0L) { acc, c -> acc*10 + (c-'0') }
 	var acc = 0L
 	val start = (if (first() == '-') 1 else 0)
 	for (i in start..lastIndex) acc = acc * 10 + (this[i] - '0')
@@ -40,5 +42,14 @@ internal fun String.toLongIgnoringOverflow(): Long {
 }
 
 
-internal fun BytePointer.asErrorMessage(): String =
+internal fun BytePointer.toJava(): String =
 	string.also { LLVM.LLVMDisposeMessage(this) }
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun <reified T> Any?.expect(): T {
+	contract {
+		returns() implies (this@expect is T)
+	}
+	require(this is T) { "Expected ${T::class.java.simpleName}, got $this" }
+	return this
+}

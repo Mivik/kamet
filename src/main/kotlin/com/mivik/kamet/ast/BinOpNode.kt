@@ -7,24 +7,30 @@ import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
 import com.mivik.kamet.implicitCast
-import com.mivik.kamet.reference
 import com.mivik.kamet.impossible
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.global.LLVM.*
 import com.mivik.kamet.Type.Primitive
+import com.mivik.kamet.expect
 import com.mivik.kamet.foldSign
 
 internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : ASTNode {
 	private fun unifyOperandTypes(lhsType: Type, rhsType: Type): Type =
 		if (lhsType !is Primitive || rhsType !is Primitive) TODO()
-		else if (lhsType == rhsType && lhsType in arrayOf(Primitive.Real.Double, Primitive.Real.Float, Primitive.Boolean)) lhsType
+		else if (lhsType == rhsType &&
+			lhsType in arrayOf(
+				Primitive.Real.Double,
+				Primitive.Real.Float,
+				Primitive.Boolean
+			)
+		) lhsType
 		else { // bit size first
-			val lhsTypedI = lhsType as Primitive.Integer
+			val lhsTypedI = lhsType as Primitive.Integral
 			val lb = lhsTypedI.sizeInBits
-			val rb = (rhsType as Primitive.Integer).sizeInBits
+			val rb = (rhsType as Primitive.Integral).sizeInBits
 			when {
 				lb > rb -> lhsType
-				lb == rb -> lhsTypedI.foldSign(unsigned = lhsType, signed = rhsType) //unsigned first
+				lb == rb -> lhsTypedI.foldSign(unsigned = lhsType, signed = rhsType) // unsigned first
 				lb < rb -> rhsType
 				else -> impossible()
 			}
@@ -36,18 +42,24 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 
 		fun fail(): Nothing = throw IllegalCastException(value.type, type)
 		val coercion = when (type) {
-			is Primitive.Integer -> {
+			is Primitive.Integral -> {
 				when (value.type) {
-					is Primitive.Integer ->
-						type.foldSign(LLVMBuildSExt(builder, value.llvm, type.llvm, "signed_ext"), LLVMBuildZExt(builder, value.llvm, type.llvm, "unsigned_ext"))
+					is Primitive.Integral ->
+						type.foldSign(
+							LLVMBuildSExt(builder, value.llvm, type.llvm, "signed_ext"),
+							LLVMBuildZExt(builder, value.llvm, type.llvm, "unsigned_ext")
+						)
 					is Primitive.Real ->
-						type.foldSign(LLVMBuildFPToSI(builder, value.llvm, type.llvm, "real_to_signed"), LLVMBuildFPToUI(builder, value.llvm, type.llvm, "real_to_unsigned"))
+						type.foldSign(
+							LLVMBuildFPToSI(builder, value.llvm, type.llvm, "real_to_signed"),
+							LLVMBuildFPToUI(builder, value.llvm, type.llvm, "real_to_unsigned")
+						)
 					else -> fail()
 				}
 			}
 			is Primitive.Real -> {
 				when (value.type) {
-					is Primitive.Integer ->
+					is Primitive.Integral ->
 						if (value.type.signed)
 							LLVMBuildSIToFP(builder, value.llvm, type.llvm, "signed_to_real")
 						else
@@ -72,27 +84,33 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 
 		return when (op) {
 			is BinOp.AssignOperators -> {
-				//v a = op(*a, b)
-				lhsMustValueRef().setIn(context, mathCodegen(context, lv.dereference(context), rv.dereference(context), op.originalOp))
+				lhsMustValueRef().setIn(
+					context,
+					mathCodegen(context, lv.dereference(context), rv.dereference(context), op.originalOp)
+				)
 				lv
 			}
 			BinOp.Assign -> {
-				lhsMustValueRef().let { it.setIn(context, rv.dereference(context).implicitCast(context, it.originalType)) }
+				lhsMustValueRef().let {
+					it.setIn(
+						context,
+						rv.dereference(context).implicitCast(context, it.originalType)
+					)
+				}
 				lv
 			}
 			BinOp.AccessMember -> {
 				require(rhs is ValueNode) { "Expected a member name, got $rhs" }
 				when (val type = lv.type) {
 					is Type.Struct -> {
-						val address = context.declareVariable("struct_store", lv)
 						val index = type.memberIndex(rhs.name)
 						Value(
-							LLVMBuildStructGEP(context.builder, address.llvm, index, "access_member"),
-							type.memberType(index).reference(true)
+							LLVMBuildExtractValue(context.builder, lv.llvm, index, "access_member"),
+							type.memberType(index)
 						)
 					}
 					is Type.Reference -> {
-						val originStruct = type.originalType as Type.Struct
+						val originStruct = type.originalType.expect<Type.Struct>()
 						val index = originStruct.memberIndex(rhs.name)
 						ValueRef(
 							LLVMBuildStructGEP(context.builder, lv.llvm, index, "access_member"),
@@ -138,7 +156,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 		return if (op.returnBoolean) // comparision
 			Value(
 				when (operandType) {
-					is Primitive.Integer -> {
+					is Primitive.Integral -> {
 						LLVMBuildICmp(
 							builder, when (op) {
 								BinOp.Equal -> LLVMIntEQ
@@ -167,7 +185,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 			)
 		else Value(
 			when (type) {
-				is Primitive.Integer ->
+				is Primitive.Integral ->
 					LLVMBuildBinOp(
 						builder, when (op) {
 							BinOp.Plus -> LLVMAdd

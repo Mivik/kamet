@@ -25,7 +25,7 @@ class JITEngine(module: LLVMModuleRef) {
 	init {
 		val error = BytePointer(null as Pointer?)
 		if (LLVMCreateJITCompilerForModule(engine, module, 2, error) != 0)
-			error("Failed to create JITEngine for module: ${error.asErrorMessage()}")
+			error("Failed to create JITEngine for module: ${error.toJava()}")
 	}
 
 	fun findFunction(name: String): LLVMValueRef =
