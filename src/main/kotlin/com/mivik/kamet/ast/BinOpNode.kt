@@ -10,7 +10,6 @@ import com.mivik.kamet.ValueRef
 import com.mivik.kamet.expect
 import com.mivik.kamet.foldSign
 import com.mivik.kamet.impossible
-import com.mivik.kamet.lazyFoldSign
 import org.bytedeco.llvm.global.LLVM.LLVMAShr
 import org.bytedeco.llvm.global.LLVM.LLVMAdd
 import org.bytedeco.llvm.global.LLVM.LLVMAnd
@@ -91,15 +90,11 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 			is Primitive.Integral -> {
 				when (value.type) {
 					is Primitive.Integral ->
-						type.lazyFoldSign(
-							{ LLVMBuildSExt(builder, value.llvm, type.llvm, "signed_ext") },
-							{ LLVMBuildZExt(builder, value.llvm, type.llvm, "unsigned_ext") }
-						)
+						if (type.signed) LLVMBuildSExt(builder, value.llvm, type.llvm, "signed_ext")
+						else LLVMBuildZExt(builder, value.llvm, type.llvm, "unsigned_ext")
 					is Primitive.Real ->
-						type.lazyFoldSign(
-							{ LLVMBuildFPToSI(builder, value.llvm, type.llvm, "real_to_signed") },
-							{ LLVMBuildFPToUI(builder, value.llvm, type.llvm, "real_to_unsigned") }
-						)
+						if (type.signed) LLVMBuildFPToSI(builder, value.llvm, type.llvm, "real_to_signed")
+						else LLVMBuildFPToUI(builder, value.llvm, type.llvm, "real_to_unsigned")
 					else -> fail()
 				}
 			}

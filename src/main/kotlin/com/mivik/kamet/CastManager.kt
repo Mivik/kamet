@@ -5,11 +5,11 @@ import org.bytedeco.llvm.global.LLVM
 typealias TPairPredicate = (Type, Type) -> Boolean
 
 /**
- * If type A be can implicitly cast to type B, they match at least one of the following rules:
- * - (A == B)
- * - ((A == Nothing*) and (B is Pointer))
- * - ((A is Reference) and (A.originalType can be implicitly cast to B))
- * - (A == Nothing)
+ * Implicit cast (A as B) requires:
+ *    (A = B)
+ * or ((A = [Type.Nothing]*) and (B is [Type.Pointer]))
+ * or ((A is [Type.Reference]) and canImplicitlyCast(referenced type of A, B))
+ * or (A = [Type.Nothing])
  *
  * Explicit cast is an extension to implicit cast
  */

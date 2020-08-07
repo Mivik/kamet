@@ -136,9 +136,6 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 internal inline val Type.isReference get() = this is Type.Reference
 internal inline val Type.isPointer get() = this is Type.Pointer
 
-internal inline fun <T> Type.Primitive.Integral.lazyFoldSign(signed: () -> T, unsigned: () -> T) =
-	if (this.signed) signed() else unsigned()
-
 @Suppress("NOTHING_TO_INLINE")
 internal inline fun <T> Type.Primitive.Integral.foldSign(signed: T, unsigned: T) = if (this.signed) signed else unsigned
 
