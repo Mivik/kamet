@@ -6,9 +6,9 @@ import com.mivik.kamet.Value
 internal class BlockNode : ASTNode {
 	val elements: MutableList<ASTNode> = mutableListOf()
 
-	override fun codegen(context: Context): Value {
+	override fun Context.codegenForThis(): Value {
 		var last = Value.Unit
-		for (element in elements) last = element.codegen(context)
+		for (element in elements) last = element.codegen()
 		return last
 	}
 

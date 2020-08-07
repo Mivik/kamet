@@ -9,10 +9,10 @@ import com.mivik.kamet.Value
 import org.bytedeco.llvm.global.LLVM
 
 internal class PrototypeNode(
-		attributes: Attributes,
-		val name: String,
-		val returnType: TypeDescriptor,
-		val parameters: List<Pair<String, TypeDescriptor>>
+	attributes: Attributes,
+	val name: String,
+	val returnType: TypeDescriptor,
+	val parameters: List<Pair<String, TypeDescriptor>>
 ) : ASTNode {
 	val mangled: String
 		get() = "$name(${parameters.joinToString(",") { "${it.second}" }}):$returnType"
@@ -29,21 +29,21 @@ internal class PrototypeNode(
 		this.functionName = functionName ?: mangled
 	}
 
-	override fun codegen(context: Context): Value {
-		context.lookupValueOrNull(functionName)?.let { return it }
-		val returnType = returnType.translate(context)
+	override fun Context.codegenForThis(): Value {
+		lookupValueOrNull(functionName)?.let { return it }
+		val returnType = returnType.translate()
 		val functionType = Type.Function(
-				returnType,
-				parameters.map { it.second.translate(context) }
+			returnType,
+			parameters.map { it.second.translate() }
 		)
-		val function = LLVM.LLVMAddFunction(context.module, functionName, functionType.llvm)
+		val function = LLVM.LLVMAddFunction(module, functionName, functionType.llvm)
 		for (i in parameters.indices) {
 			val paramName = parameters[i].first
 			LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, i), paramName, paramName.length.toLong())
 		}
-		return Value(function, functionType).also { context.declareFunction(this, it) }
+		return Value(function, functionType).also { declareFunction(this@PrototypeNode, it) }
 	}
 
 	override fun toString(): String =
-			"fun $name(${parameters.joinToString(", ") { "${it.first}: ${it.second}" }}): $returnType"
+		"fun $name(${parameters.joinToString { "${it.first}: ${it.second}" }}): $returnType"
 }

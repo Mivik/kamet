@@ -40,7 +40,7 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	object Unit : Type("Unit", LLVM.LLVMVoidType())
 
 	class Function(val returnType: Type, val parameterTypes: List<Type>) : Type(
-		"$returnType(${parameterTypes.joinToString(", ")})",
+		"$returnType(${parameterTypes.joinToString()})",
 		LLVM.LLVMFunctionType(
 			returnType.llvm,
 			PointerPointer(*Array(parameterTypes.size) { parameterTypes[it].llvm }),

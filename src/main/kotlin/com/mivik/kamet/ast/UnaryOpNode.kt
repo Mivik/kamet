@@ -6,17 +6,16 @@ import com.mivik.kamet.UnaryOp
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
 import com.mivik.kamet.expect
-import com.mivik.kamet.pointer
 import com.mivik.kamet.impossible
+import com.mivik.kamet.pointer
 import org.bytedeco.llvm.global.LLVM
 
 internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boolean = false) : ASTNode {
-	override fun codegen(context: Context): Value {
-		val builder = context.builder
-		var value = value.codegen(context)
+	override fun Context.codegenForThis(): Value {
+		var value = value.codegen()
 		when (op) {
 			UnaryOp.Indirection -> {
-				value = value.dereference(context)
+				value = value.dereference()
 				val type = value.type
 				require(type is Type.Pointer) { "Indirection of a non-pointer type: ${value.type}" }
 				return ValueRef(value.llvm, type.originalType, type.isConst)
@@ -29,21 +28,21 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 			UnaryOp.Increment -> {
 				require(value is ValueRef && !value.isConst) { "Increment on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
-				val ret = if (after) value.dereference(context) else value
-				value.setIn(
-					context, Value(
+				val ret = if (after) value.dereference() else value
+				value.setValue(
+					Value(
 						when (originalType) {
 							is Type.Primitive.Integral ->
 								LLVM.LLVMBuildAdd(
 									builder,
-									value.dereference(context).llvm,
+									value.dereference().llvm,
 									LLVM.LLVMConstInt(originalType.llvm, 1L, 0),
 									"increment"
 								)
 							is Type.Primitive.Real ->
 								LLVM.LLVMBuildFAdd(
 									builder,
-									value.dereference(context).llvm,
+									value.dereference().llvm,
 									LLVM.LLVMConstReal(originalType.llvm, 1.0),
 									"increment"
 								)
@@ -56,21 +55,21 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 			UnaryOp.Decrement -> {
 				require(value is ValueRef && !value.isConst) { "Decrement on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
-				val ret = if (after) value.dereference(context) else value
-				value.setIn(
-					context, Value(
+				val ret = if (after) value.dereference() else value
+				value.setValue(
+					Value(
 						when (originalType) {
 							is Type.Primitive.Integral ->
 								LLVM.LLVMBuildSub(
 									builder,
-									value.dereference(context).llvm,
+									value.dereference().llvm,
 									LLVM.LLVMConstInt(originalType.llvm, 1L, 0),
 									"decrement"
 								)
 							is Type.Primitive.Real ->
 								LLVM.LLVMBuildFSub(
 									builder,
-									value.dereference(context).llvm,
+									value.dereference().llvm,
 									LLVM.LLVMConstReal(originalType.llvm, 1.0),
 									"decrement"
 								)

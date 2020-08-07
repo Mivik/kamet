@@ -1,21 +1,20 @@
 package com.mivik.kamet.ast
 
-import com.mivik.kamet.CastManager
 import com.mivik.kamet.Context
 import com.mivik.kamet.TypeDescriptor
 import com.mivik.kamet.Value
 import org.bytedeco.llvm.global.LLVM
 
-private fun convert(context: Context, value: Value, expected: TypeDescriptor? = null): Value {
-	val type = expected?.translate(context)
-	type?.let { return CastManager.implicitCast(context, value, type) }
+private fun Context.convert(value: Value, expected: TypeDescriptor? = null): Value {
+	val type = expected?.translate()
+	type?.let { return value.implicitCast(type) }
 	return value
 }
 
 internal class ValDeclareNode(val name: String, val type: TypeDescriptor? = null, val defaultValue: ASTNode) : ASTNode {
-	override fun codegen(context: Context): Value {
-		val value = convert(context, defaultValue.codegen(context), type)
-		context.declare(name, value)
+	override fun Context.codegenForThis(): Value {
+		val value = convert(defaultValue.codegen(), type)
+		declare(name, value)
 		LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
 		return Value.Nothing
 	}
@@ -29,9 +28,9 @@ internal class VarDeclareNode(
 	val defaultValue: ASTNode,
 	val isConst: Boolean = false
 ) : ASTNode {
-	override fun codegen(context: Context): Value {
-		val value = convert(context, defaultValue.codegen(context), type)
-		context.declareVariable(name, value, isConst)
+	override fun Context.codegenForThis(): Value {
+		val value = convert(defaultValue.codegen(), type)
+		declareVariable(name, value, isConst)
 		return Value.Nothing
 	}
 

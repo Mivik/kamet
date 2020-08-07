@@ -4,7 +4,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 
 internal class DirectNode(val value: Value) : ASTNode {
-	override fun codegen(context: Context): Value = value
+	override fun Context.codegenForThis(): Value = value
 
 	override fun toString(): String = value.toString()
 }

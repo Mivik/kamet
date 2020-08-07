@@ -1,6 +1,5 @@
 package com.mivik.kamet.ast
 
-import com.mivik.kamet.CastManager
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
@@ -9,11 +8,11 @@ import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.global.LLVM
 
 internal class InvocationNode(val name: String, val elements: List<ASTNode>) : ASTNode {
-	private fun findMatchingFunction(context: Context, arguments: List<Value>): Value {
+	private fun Context.findMatchingFunction(arguments: List<Value>): Value {
 		val functions =
-			context.lookupFunctions(name).takeUnless { it.isEmpty() } ?: error("No function named \"$name\"")
+			lookupFunctions(name).takeUnless { it.isEmpty() } ?: error("No function named \"$name\"")
 		var found: Value? = null
-		val argStr by lazy { arguments.joinToString(", ") { it.type.name } }
+		val argStr by lazy { arguments.joinToString { it.type.name } }
 		nextFunction@ for (function in functions) {
 			val type = function.type as Type.Function
 			val parameterTypes = type.parameterTypes
@@ -26,17 +25,17 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 		return found ?: error("No matching function for call to \"$name\" with argument types: ($argStr)")
 	}
 
-	override fun codegen(context: Context): Value {
-		val arguments = elements.map { it.codegen(context) }
-		val function = findMatchingFunction(context, arguments)
+	override fun Context.codegenForThis(): Value {
+		val arguments = elements.map { it.codegen() }
+		val function = findMatchingFunction(arguments)
 		val type = function.type as Type.Function
 		val parameterTypes = type.parameterTypes
 		return Value(
 			LLVM.LLVMBuildCall(
-				context.builder,
+				builder,
 				function.llvm,
 				PointerPointer(*Array(arguments.size) {
-					CastManager.implicitCast(context, arguments[it], parameterTypes[it]).llvm
+					arguments[it].implicitCast(parameterTypes[it]).llvm
 				}),
 				arguments.size,
 				if (type.returnType.canImplicitlyCastTo(Type.Unit)) "" else "${name}_result"
@@ -44,5 +43,5 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 		)
 	}
 
-	override fun toString(): String = "$name(${elements.joinToString(", ")})"
+	override fun toString(): String = "$name(${elements.joinToString()})"
 }

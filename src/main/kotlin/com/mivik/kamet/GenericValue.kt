@@ -1,10 +1,15 @@
 package com.mivik.kamet
 
+import com.mivik.kamet.Type.Primitive
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.llvm.LLVM.LLVMGenericValueRef
-import org.bytedeco.llvm.global.LLVM.*
-import com.mivik.kamet.Type.Primitive
+import org.bytedeco.llvm.global.LLVM.LLVMCreateGenericValueOfFloat
+import org.bytedeco.llvm.global.LLVM.LLVMCreateGenericValueOfInt
+import org.bytedeco.llvm.global.LLVM.LLVMCreateGenericValueOfPointer
+import org.bytedeco.llvm.global.LLVM.LLVMGenericValueToFloat
+import org.bytedeco.llvm.global.LLVM.LLVMGenericValueToInt
+import org.bytedeco.llvm.global.LLVM.LLVMGenericValueToPointer
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun fromLong(type: Type, value: Long, signed: Boolean = true) =

@@ -6,7 +6,14 @@ import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMExecutionEngineRef
 import org.bytedeco.llvm.LLVM.LLVMModuleRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
-import org.bytedeco.llvm.global.LLVM.*
+import org.bytedeco.llvm.global.LLVM.LLVMCreateJITCompilerForModule
+import org.bytedeco.llvm.global.LLVM.LLVMDisposeExecutionEngine
+import org.bytedeco.llvm.global.LLVM.LLVMFindFunction
+import org.bytedeco.llvm.global.LLVM.LLVMInitializeNativeAsmParser
+import org.bytedeco.llvm.global.LLVM.LLVMInitializeNativeAsmPrinter
+import org.bytedeco.llvm.global.LLVM.LLVMInitializeNativeTarget
+import org.bytedeco.llvm.global.LLVM.LLVMLinkInMCJIT
+import org.bytedeco.llvm.global.LLVM.LLVMRunFunction
 
 class JITEngine(module: LLVMModuleRef) {
 	companion object {

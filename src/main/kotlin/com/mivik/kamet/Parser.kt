@@ -1,10 +1,10 @@
 package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
-import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
 import com.mivik.kamet.ast.CastNode
+import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.IfNode

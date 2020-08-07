@@ -22,34 +22,30 @@ internal object CastManager {
 
 	fun canImplicitlyCast(from: Type, to: Type) = allCases.any { it(from, to) }
 
-	private fun implicitCastOrNull(context: Context, from: Value, to: Type): Value? = when {
-		from.type is Type.Reference -> implicitCastOrNull(context, from.dereference(context), to)
-		from.type == Type.Nothing -> from.also { LLVM.LLVMBuildUnreachable(context.builder) }
+	private fun Context.implicitCastOrNull(from: Value, to: Type): Value? = when {
+		from.type is Type.Reference -> implicitCastOrNull(from.dereference(), to)
+		from.type == Type.Nothing -> from.also { LLVM.LLVMBuildUnreachable(builder) }
 		case1(from.type, to) -> from
 		case2(from.type, to) -> Value(
-			LLVM.LLVMBuildBitCast(context.builder, from.llvm, to.llvm, "pointer_cast"),
+			LLVM.LLVMBuildBitCast(builder, from.llvm, to.llvm, "pointer_cast"),
 			type = to
 		)
 		else -> null
 	}
 
-	fun implicitCast(context: Context, from: Value, to: Type): Value =
-		implicitCastOrNull(context, from, to) ?: fail(from, to)
+	fun Context.implicitCast(from: Value, to: Type): Value =
+		implicitCastOrNull(from, to) ?: fail(from, to)
 
 	@Suppress("NOTHING_TO_INLINE")
 	inline fun fail(from: Value, to: Type): Nothing = error("Attempt to cast a ${from.type} to $to")
 
-	fun explicitCastOrNull(context: Context, from: Value, dest: Type): Value? {
-		implicitCastOrNull(context, from, dest)?.let { return it }
+	fun Context.explicitCastOrNull(from: Value, dest: Type): Value? {
+		implicitCastOrNull(from, dest)?.let { return it }
 		return when {
-			from.type.isReference -> explicitCastOrNull(
-				context,
-				from.dereference(context),
-				dest
-			)
+			from.type.isReference -> explicitCastOrNull(from.dereference(), dest)
 			from.type.isPointer && dest.isPointer -> Value(
 				LLVM.LLVMBuildBitCast(
-					context.builder,
+					builder,
 					from.llvm,
 					dest.llvm,
 					"pointer_cast"
@@ -57,7 +53,7 @@ internal object CastManager {
 			)
 			from.type is Type.Primitive && dest is Type.Primitive -> Value(
 				LLVM.LLVMBuildCast(
-					context.builder, when (val type = from.type) {
+					builder, when (val type = from.type) {
 						is Type.Primitive.Integral ->
 							when (dest) {
 								is Type.Primitive.Integral ->
@@ -90,14 +86,8 @@ internal object CastManager {
 		}
 	}
 
-	fun explicitCast(context: Context, from: Value, to: Type) = explicitCastOrNull(context, from, to) ?: fail(from, to)
+	fun Context.explicitCast(from: Value, to: Type) = explicitCastOrNull(from, to) ?: fail(from, to)
 }
 
 @Suppress("NOTHING_TO_INLINE")
-internal inline fun Value.implicitCast(context: Context, to: Type) = CastManager.implicitCast(context, this, to)
-
-@Suppress("NOTHING_TO_INLINE")
 internal inline fun Type.canImplicitlyCastTo(to: Type) = CastManager.canImplicitlyCast(this, to)
-
-@Suppress("NOTHING_TO_INLINE")
-internal inline fun Type.equivalent(other: Type) = this.canImplicitlyCastTo(other) || other.canImplicitlyCastTo(this)

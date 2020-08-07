@@ -4,7 +4,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 
 internal interface ASTNode {
-	fun codegen(context: Context): Value
+	fun Context.codegenForThis(): Value
 
 	val returned: Boolean get() = false
 }

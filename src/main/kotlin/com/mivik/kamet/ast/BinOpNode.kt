@@ -4,16 +4,61 @@ import com.mivik.kamet.BinOp
 import com.mivik.kamet.Context
 import com.mivik.kamet.IllegalCastException
 import com.mivik.kamet.Type
+import com.mivik.kamet.Type.Primitive
 import com.mivik.kamet.Value
 import com.mivik.kamet.ValueRef
-import com.mivik.kamet.implicitCast
-import com.mivik.kamet.impossible
-import org.bytedeco.llvm.LLVM.LLVMBuilderRef
-import org.bytedeco.llvm.global.LLVM.*
-import com.mivik.kamet.Type.Primitive
 import com.mivik.kamet.expect
 import com.mivik.kamet.foldSign
+import com.mivik.kamet.impossible
 import com.mivik.kamet.lazyFoldSign
+import org.bytedeco.llvm.global.LLVM.LLVMAShr
+import org.bytedeco.llvm.global.LLVM.LLVMAdd
+import org.bytedeco.llvm.global.LLVM.LLVMAnd
+import org.bytedeco.llvm.global.LLVM.LLVMBuildAnd
+import org.bytedeco.llvm.global.LLVM.LLVMBuildBinOp
+import org.bytedeco.llvm.global.LLVM.LLVMBuildExtractValue
+import org.bytedeco.llvm.global.LLVM.LLVMBuildFCmp
+import org.bytedeco.llvm.global.LLVM.LLVMBuildFPExt
+import org.bytedeco.llvm.global.LLVM.LLVMBuildFPToSI
+import org.bytedeco.llvm.global.LLVM.LLVMBuildFPToUI
+import org.bytedeco.llvm.global.LLVM.LLVMBuildICmp
+import org.bytedeco.llvm.global.LLVM.LLVMBuildOr
+import org.bytedeco.llvm.global.LLVM.LLVMBuildSExt
+import org.bytedeco.llvm.global.LLVM.LLVMBuildSIToFP
+import org.bytedeco.llvm.global.LLVM.LLVMBuildStructGEP
+import org.bytedeco.llvm.global.LLVM.LLVMBuildUIToFP
+import org.bytedeco.llvm.global.LLVM.LLVMBuildZExt
+import org.bytedeco.llvm.global.LLVM.LLVMFAdd
+import org.bytedeco.llvm.global.LLVM.LLVMFDiv
+import org.bytedeco.llvm.global.LLVM.LLVMFMul
+import org.bytedeco.llvm.global.LLVM.LLVMFRem
+import org.bytedeco.llvm.global.LLVM.LLVMFSub
+import org.bytedeco.llvm.global.LLVM.LLVMIntEQ
+import org.bytedeco.llvm.global.LLVM.LLVMIntNE
+import org.bytedeco.llvm.global.LLVM.LLVMIntSGE
+import org.bytedeco.llvm.global.LLVM.LLVMIntSGT
+import org.bytedeco.llvm.global.LLVM.LLVMIntSLE
+import org.bytedeco.llvm.global.LLVM.LLVMIntSLT
+import org.bytedeco.llvm.global.LLVM.LLVMIntUGE
+import org.bytedeco.llvm.global.LLVM.LLVMIntUGT
+import org.bytedeco.llvm.global.LLVM.LLVMIntULE
+import org.bytedeco.llvm.global.LLVM.LLVMIntULT
+import org.bytedeco.llvm.global.LLVM.LLVMLShr
+import org.bytedeco.llvm.global.LLVM.LLVMMul
+import org.bytedeco.llvm.global.LLVM.LLVMOr
+import org.bytedeco.llvm.global.LLVM.LLVMRealOEQ
+import org.bytedeco.llvm.global.LLVM.LLVMRealOGE
+import org.bytedeco.llvm.global.LLVM.LLVMRealOGT
+import org.bytedeco.llvm.global.LLVM.LLVMRealOLE
+import org.bytedeco.llvm.global.LLVM.LLVMRealOLT
+import org.bytedeco.llvm.global.LLVM.LLVMRealONE
+import org.bytedeco.llvm.global.LLVM.LLVMSDiv
+import org.bytedeco.llvm.global.LLVM.LLVMSRem
+import org.bytedeco.llvm.global.LLVM.LLVMShl
+import org.bytedeco.llvm.global.LLVM.LLVMSub
+import org.bytedeco.llvm.global.LLVM.LLVMUDiv
+import org.bytedeco.llvm.global.LLVM.LLVMURem
+import org.bytedeco.llvm.global.LLVM.LLVMXor
 
 internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : ASTNode {
 	private fun unifyOperandTypes(lhsType: Type, rhsType: Type): Type =
@@ -37,7 +82,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 			}
 		}
 
-	private fun liftIn(builder: LLVMBuilderRef, value: Value, type: Type): Value { // numeric lifting casts
+	private fun Context.lift(value: Value, type: Type): Value { // numeric lifting casts
 		if (value.type == type) return value
 		if (type !is Primitive) TODO()
 
@@ -75,9 +120,9 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 		return Value(coercion, type)
 	}
 
-	override fun codegen(context: Context): Value {
-		val lv = lhs.codegen(context)
-		val rv = rhs.codegen(context)
+	override fun Context.codegenForThis(): Value {
+		val lv = lhs.codegen()
+		val rv = rhs.codegen()
 		fun lhsMustValueRef(): ValueRef {
 			require(lv is ValueRef && !lv.isConst) { "Assigning to a non-reference type: ${lv.type}" }
 			return lv
@@ -85,18 +130,14 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 
 		return when (op) {
 			is BinOp.AssignOperators -> {
-				lhsMustValueRef().setIn(
-					context,
-					mathCodegen(context, lv.dereference(context), rv.dereference(context), op.originalOp)
+				lhsMustValueRef().setValue(
+					arithmeticCodegen(lv.dereference(), rv.dereference(), op.originalOp)
 				)
 				lv
 			}
 			BinOp.Assign -> {
 				lhsMustValueRef().let {
-					it.setIn(
-						context,
-						rv.dereference(context).implicitCast(context, it.originalType)
-					)
+					it.setValue(rv.dereference().implicitCast(it.originalType))
 				}
 				lv
 			}
@@ -106,7 +147,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 					is Type.Struct -> {
 						val index = type.memberIndex(rhs.name)
 						Value(
-							LLVMBuildExtractValue(context.builder, lv.llvm, index, "access_member"),
+							LLVMBuildExtractValue(builder, lv.llvm, index, "access_member"),
 							type.memberType(index)
 						)
 					}
@@ -114,7 +155,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 						val originStruct = type.originalType.expect<Type.Struct>()
 						val index = originStruct.memberIndex(rhs.name)
 						ValueRef(
-							LLVMBuildStructGEP(context.builder, lv.llvm, index, "access_member"),
+							LLVMBuildStructGEP(builder, lv.llvm, index, "access_member"),
 							originStruct.memberType(index),
 							type.isConst
 						)
@@ -122,18 +163,17 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 					else -> TODO("branches for more types, and extension")
 				}
 			}
-			else -> mathCodegen(context, lv.dereference(context), rv.dereference(context), op)
+			else -> arithmeticCodegen(lv.dereference(), rv.dereference(), op)
 		}
 	}
 
-	private fun mathCodegen(context: Context, lhs: Value, rhs: Value, op: BinOp): Value {
+	private fun Context.arithmeticCodegen(lhs: Value, rhs: Value, op: BinOp): Value {
 		val operandType = unifyOperandTypes(lhs.type, rhs.type)
 		val type =
 			if (op.returnBoolean) Primitive.Boolean
 			else operandType
-		val builder = context.builder
-		val lhsValue = liftIn(builder, lhs, operandType).llvm
-		val rhsValue = liftIn(builder, rhs, operandType).llvm
+		val lhsValue = lift(lhs, operandType).llvm
+		val rhsValue = lift(rhs, operandType).llvm
 		if (operandType == Primitive.Boolean) {
 			return Value(
 				when (op) {

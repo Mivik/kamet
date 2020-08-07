@@ -4,15 +4,14 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.canImplicitlyCastTo
-import com.mivik.kamet.implicitCast
 import org.bytedeco.llvm.global.LLVM
 
 internal class ReturnNode(val value: ASTNode) : ASTNode {
-	override fun codegen(context: Context): Value {
-		val returnType = (context.currentFunction!!.type as Type.Function).returnType
-		val result = value.codegen(context).implicitCast(context, returnType)
-		if (result.type.canImplicitlyCastTo(Type.Unit)) LLVM.LLVMBuildRetVoid(context.builder)
-		else LLVM.LLVMBuildRet(context.builder, result.llvm)
+	override fun Context.codegenForThis(): Value {
+		val returnType = (currentFunction!!.type as Type.Function).returnType
+		val result = value.codegen().implicitCast(returnType)
+		if (result.type.canImplicitlyCastTo(Type.Unit)) LLVM.LLVMBuildRetVoid(builder)
+		else LLVM.LLVMBuildRet(builder, result.llvm)
 		return Value.Nothing
 	}
 

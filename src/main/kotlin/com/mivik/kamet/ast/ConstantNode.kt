@@ -9,9 +9,10 @@ import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
 internal class ConstantNode(val type: Type.Primitive, val value: String) : ASTNode {
-	override fun codegen(context: Context) = Value(makeLLVMConst(), type)
+	override fun Context.codegenForThis() = Value(makeLLVMConst(), type)
 
-	private fun makeLLVMConst(): LLVMValueRef {
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun makeLLVMConst(): LLVMValueRef {
 		return when (type) {
 			Type.Primitive.Integral.Char -> LLVM.LLVMConstInt(type.llvm, run {
 				val content = value.substring(1, value.length - 1) // '[content]'

@@ -1,33 +1,33 @@
 package com.mivik.kamet
 
 internal sealed class TypeDescriptor {
-	abstract fun translate(context: Context): Type
+	abstract fun Context.translateForThis(): Type
 
 	class Direct(val type: Type) : TypeDescriptor() {
-		override fun translate(context: Context): Type = type
+		override fun Context.translateForThis(): Type = type
 		override fun toString(): String = type.toString()
 	}
 
 	class Named(val name: String) : TypeDescriptor() {
-		override fun translate(context: Context): Type = context.lookupType(name)
+		override fun Context.translateForThis(): Type = lookupType(name)
 		override fun toString(): String = name
 	}
 
 	class Reference(val originalType: TypeDescriptor, val isConst: Boolean) : TypeDescriptor() {
-		override fun translate(context: Context): Type = originalType.translate(context).reference(isConst)
+		override fun Context.translateForThis(): Type = originalType.translate().reference(isConst)
 		override fun toString(): String = "&${if (isConst) "const " else ""}$originalType"
 	}
 
 	class Pointer(val originalType: TypeDescriptor, val isConst: Boolean) : TypeDescriptor() {
-		override fun translate(context: Context): Type = originalType.translate(context).pointer(isConst)
+		override fun Context.translateForThis(): Type = originalType.translate().pointer(isConst)
 		override fun toString(): String = "*${if (isConst) "const " else ""}$originalType"
 	}
 
 	class Function(val returnType: TypeDescriptor, val parameterTypes: List<TypeDescriptor>) : TypeDescriptor() {
-		override fun translate(context: Context): Type =
-			Type.Function(returnType.translate(context), parameterTypes.map { it.translate(context) })
+		override fun Context.translateForThis(): Type =
+			Type.Function(returnType.translate(), parameterTypes.map { it.translate() })
 
-		override fun toString(): String = "$returnType(${parameterTypes.joinToString(", ")})"
+		override fun toString(): String = "$returnType(${parameterTypes.joinToString()})"
 	}
 }
 

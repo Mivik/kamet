@@ -11,25 +11,25 @@ import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
 class Context(
-		val parent: Context?,
-		val module: LLVMModuleRef,
-		val builder: LLVMBuilderRef,
-		val currentFunction: Value?,
-		private val valueMap: MutableMap<String, Value>,
-		private val typeMap: MutableMap<String, Type>,
-		private val functionMap: MutableMap<String, MutableList<Value>>
+	val parent: Context?,
+	val module: LLVMModuleRef,
+	val builder: LLVMBuilderRef,
+	val currentFunction: Value?,
+	private val valueMap: MutableMap<String, Value>,
+	private val typeMap: MutableMap<String, Type>,
+	private val functionMap: MutableMap<String, MutableList<Value>>
 ) {
 	companion object {
 		fun topLevel(moduleName: String): Context =
-				Context(
-						null,
-						LLVM.LLVMModuleCreateWithName(moduleName),
-						LLVM.LLVMCreateBuilder(),
-						null,
-						mutableMapOf(),
-						Type.defaultTypeMap(),
-						mutableMapOf()
-				)
+			Context(
+				null,
+				LLVM.LLVMModuleCreateWithName(moduleName),
+				LLVM.LLVMCreateBuilder(),
+				null,
+				mutableMapOf(),
+				Type.defaultTypeMap(),
+				mutableMapOf()
+			)
 	}
 
 	val llvmFunction: LLVMValueRef
@@ -67,17 +67,36 @@ class Context(
 	}
 
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
-			Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
+		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
 
-	inline var block: LLVMBasicBlockRef
+	inline var basicBlock: LLVMBasicBlockRef
 		get() = LLVM.LLVMGetInsertBlock(builder)
 		set(block) {
 			LLVM.LLVMPositionBuilderAtEnd(builder, block)
 		}
 
-	internal fun codegenUsing(block: LLVMBasicBlockRef, node: ASTNode): Value {
-		this.block = block
-		return node.codegen(this)
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun ASTNode.codegen() = with(this) { codegenForThis() }
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun Value.dereference() = with(this) { dereferenceForThis() }
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun ValueRef.setValue(value: Value) = with(this) { setValueForThis(value) }
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun Value.implicitCast(to: Type) = with(CastManager) { implicitCast(this@implicitCast, to) }
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun TypeDescriptor.translate() = with(this) { translateForThis() }
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun ASTNode.codegenUsing(block: LLVMBasicBlockRef): Value {
+		basicBlock = block
+		return codegen()
 	}
 
 	fun declareVariable(name: String, value: Value, isConst: Boolean = false): ValueRef {
@@ -91,7 +110,7 @@ class Context(
 		LLVM.LLVMSetValueName2(address, name, name.length.toLong())
 		LLVM.LLVMDisposeBuilder(tmpBuilder)
 		declare(name, ret)
-		if (LLVM.LLVMIsUndef(value.llvm) == 0) ret.setIn(this, value)
+		if (LLVM.LLVMIsUndef(value.llvm) == 0) ret.setValue(value)
 		return ret
 	}
 
@@ -102,7 +121,7 @@ class Context(
 			if (parameterTypes.size != type.parameterTypes.size) continue
 			for (i in parameterTypes.indices)
 				if (parameterTypes[i] != type.parameterTypes[i]) continue@findDuplicate
-			error("Function ${prototype.name} redeclared with same parameter types: (${parameterTypes.joinToString(", ")})")
+			error("Function ${prototype.name} redeclared with same parameter types: (${parameterTypes.joinToString()})")
 		}
 		declare(prototype.functionName, value)
 		functionMap.getOrPut(prototype.name) { mutableListOf() } += value

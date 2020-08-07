@@ -9,5 +9,5 @@ open class Value(val llvm: LLVMValueRef, val type: Type) {
 		val Nothing = Value(LLVM.LLVMGetUndef(Type.Nothing.llvm), Type.Nothing)
 	}
 
-	open fun dereference(context: Context): Value = this
+	open fun Context.dereferenceForThis(): Value = this@Value
 }

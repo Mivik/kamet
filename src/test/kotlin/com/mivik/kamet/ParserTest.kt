@@ -10,30 +10,30 @@ import kotlin.test.assertEquals
 
 internal class ParserTest {
 	private fun String.parse(context: Context = Context.topLevel("evaluate")): Value =
-		Parser(this).takeExpr().codegen(context)
+		with(Parser(this).takeExpr()) { context.codegenForThis() }
 
 	private fun String.evaluate(): GenericValue =
-		Context.topLevel("evaluate").let {
+		Context.topLevel("evaluate").let { context ->
 			val functionName = "eval"
 			val parser = Parser(this)
-			val expr = parser.takeExpr().codegen(it)
+			val expr = parser.takeExpr().let { with(context) { it.codegen() } }
 			FunctionNode(
 				PrototypeNode(setOf(Attribute.NATIVE), functionName, expr.type.asDescriptor(), emptyList()),
 				BlockNode().apply {
 					elements += ReturnNode(expr.direct())
-				}).codegen(it)
-			it.verify()?.let { msg -> error("Verification failed: $msg") }
-			val engine = JITEngine(it)
+				}).let { with(context) { it.codegen() } }
+			context.verify()?.let { msg -> error("Verification failed: $msg") }
+			val engine = JITEngine(context)
 			val result = engine.run(functionName)
 			engine.dispose()
 			result
 		}
 
 	private fun String.compile(): JITEngine =
-		Context.topLevel("evaluate").let {
-			Parser(this).parse().codegen(it)
-			it.verify()?.let { msg -> error("Verification failed: $msg") }
-			JITEngine(it)
+		Context.topLevel("evaluate").let { context ->
+			Parser(this).parse().let { with(context) { it.codegen() } }
+			context.verify()?.let { msg -> error("Verification failed: $msg") }
+			JITEngine(context)
 		}
 
 	private fun String.runFunction(functionName: String, argument: GenericValue? = null): GenericValue =

@@ -5,15 +5,15 @@ import com.mivik.kamet.Value
 import org.bytedeco.llvm.global.LLVM
 
 internal class DoWhileNode(val block: ASTNode, val condition: ASTNode) : ASTNode {
-	override fun codegen(context: Context): Value {
-		val function = context.llvmFunction
+	override fun Context.codegenForThis(): Value {
+		val function = llvmFunction
 		val whileBB = LLVM.LLVMAppendBasicBlock(function, "while")
 		val finalBB = LLVM.LLVMAppendBasicBlock(function, "final")
-		LLVM.LLVMBuildBr(context.builder, whileBB)
-		context.block = whileBB
-		block.codegen(context)
-		LLVM.LLVMBuildCondBr(context.builder, condition.codegen(context).llvm, whileBB, finalBB)
-		context.block = finalBB
+		LLVM.LLVMBuildBr(builder, whileBB)
+		basicBlock = whileBB
+		block.codegen()
+		LLVM.LLVMBuildCondBr(builder, condition.codegen().llvm, whileBB, finalBB)
+		basicBlock = finalBB
 		return Value.Nothing
 	}
 

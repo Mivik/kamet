@@ -22,8 +22,8 @@ internal class StructNode(
 		this.isPacked = packed
 	}
 
-	override fun codegen(context: Context): Value {
-		context.declareType(Type.Struct(name, elements.map { Pair(it.first, it.second.translate(context)) }, isPacked))
+	override fun Context.codegenForThis(): Value {
+		declareType(Type.Struct(name, elements.map { Pair(it.first, it.second.translate()) }, isPacked))
 		return Value.Nothing
 	}
 }
