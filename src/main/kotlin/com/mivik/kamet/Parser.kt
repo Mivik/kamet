@@ -151,7 +151,6 @@ internal class Parser(private val lexer: Lexer) {
 		when (trimAndPeek()) {
 			Token.Val -> {
 				take()
-				// TODO better error output for stuff like this (should output "Expected xxx, got xxx" instead of throwing an cast error)
 				val name = take().expect<Token.Identifier>().name
 				var type: TypeDescriptor? = null
 				if (peek() == Token.Colon) {

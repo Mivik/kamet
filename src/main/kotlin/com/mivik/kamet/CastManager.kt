@@ -5,11 +5,11 @@ import org.bytedeco.llvm.global.LLVM
 typealias TPairPredicate = (Type, Type) -> Boolean
 
 /**
- * Implicit cast requires A and B, two types, match at least one of the following rules:
- * - (A = B)
- * - (A=Nothing* and B=*)
- * - (A is Nothing)
- * - ([A is Reference] and [A.originalType can be implicitly cast to B])
+ * If type A be can implicitly cast to type B, they match at least one of the following rules:
+ * - (A == B)
+ * - ((A == Nothing*) and (B is Pointer))
+ * - ((A is Reference) and (A.originalType can be implicitly cast to B))
+ * - (A == Nothing)
  *
  * Explicit cast is an extension to implicit cast
  */
@@ -17,9 +17,10 @@ internal object CastManager {
 	private val case1: TPairPredicate = { a, b -> a == b }
 	private val case2: TPairPredicate = { a, b -> a is Type.Pointer && (a.originalType == Type.Nothing) && b.isPointer }
 	private val case3: TPairPredicate = { a, b -> a is Type.Reference && canImplicitlyCast(a.originalType, b) }
-	private val allCases = arrayOf(case1, case2, case3)
+	private val case4: TPairPredicate = { a, _ -> a == Type.Nothing }
+	private val allCases = arrayOf(case1, case2, case3, case4)
 
-	fun canImplicitlyCast(from: Type, to: Type) = allCases.any { it(from, to) } // recursive case3
+	fun canImplicitlyCast(from: Type, to: Type) = allCases.any { it(from, to) }
 
 	private fun implicitCastOrNull(context: Context, from: Value, to: Type): Value? = when {
 		from.type is Type.Reference -> implicitCastOrNull(context, from.dereference(context), to)
