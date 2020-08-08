@@ -7,9 +7,8 @@ internal class BlockNode : ASTNode {
 	val elements: MutableList<ASTNode> = mutableListOf()
 
 	override fun Context.codegenForThis(): Value {
-		var last = Value.Unit
-		for (element in elements) last = element.codegen()
-		return last
+		for (i in 0 until elements.lastIndex) elements[i].codegen()
+		return elements.lastOrNull()?.codegen() ?: Value.Unit
 	}
 
 	override fun toString(): String =

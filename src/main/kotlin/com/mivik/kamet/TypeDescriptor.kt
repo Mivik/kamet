@@ -13,6 +13,14 @@ internal sealed class TypeDescriptor {
 		override fun toString(): String = name
 	}
 
+	class Array(val elementType: TypeDescriptor, val size: Int, val isConst: Boolean) : TypeDescriptor() {
+		override fun Context.translateForThis(): Type =
+			Type.Array(elementType.translate(), size, isConst)
+
+		override fun toString(): String =
+			"[${if (isConst) "const " else ""}$elementType, $size]"
+	}
+
 	class Reference(val originalType: TypeDescriptor, val isConst: Boolean) : TypeDescriptor() {
 		override fun Context.translateForThis(): Type = originalType.translate().reference(isConst)
 		override fun toString(): String = "&${if (isConst) "const " else ""}$originalType"

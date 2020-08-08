@@ -23,7 +23,7 @@ internal class PrototypeNode(
 		var functionName: String? = null
 		for (attr in attributes)
 			when (attr) {
-				Attribute.NATIVE -> functionName = name
+				Attribute.NO_MANGLE -> functionName = name
 				else -> attr.notApplicableTo("Prototype")
 			}
 		this.functionName = functionName ?: mangled

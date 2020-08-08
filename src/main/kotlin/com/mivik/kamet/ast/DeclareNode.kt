@@ -6,16 +6,30 @@ import com.mivik.kamet.Value
 import org.bytedeco.llvm.global.LLVM
 
 private fun Context.convert(value: Value, expected: TypeDescriptor? = null): Value {
-	val type = expected?.translate()
-	type?.let { return value.implicitCast(type) }
+	expected?.translate()?.let { return value.implicitCast(it) }
 	return value
 }
 
-internal class ValDeclareNode(val name: String, val type: TypeDescriptor? = null, val defaultValue: ASTNode) : ASTNode {
+@Suppress("NOTHING_TO_INLINE")
+private inline fun unclearVariable(name: String): Nothing =
+	error("Declaration of variable \"$name\" without type or initializer.")
+
+internal class ValDeclareNode(
+	val name: String,
+	val type: TypeDescriptor? = null,
+	val defaultValue: ASTNode? = null
+) : ASTNode {
 	override fun Context.codegenForThis(): Value {
-		val value = convert(defaultValue.codegen(), type)
-		declare(name, value)
-		LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
+		if (defaultValue == null) {
+			type ?: unclearVariable(name)
+			val value = type.translate().undefined()
+			declare(name, value)
+			LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
+		} else {
+			val value = convert(defaultValue.codegen(), type)
+			declare(name, value)
+			LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
+		}
 		return Value.Nothing
 	}
 
@@ -25,12 +39,15 @@ internal class ValDeclareNode(val name: String, val type: TypeDescriptor? = null
 internal class VarDeclareNode(
 	val name: String,
 	val type: TypeDescriptor? = null,
-	val defaultValue: ASTNode,
+	val defaultValue: ASTNode? = null,
 	val isConst: Boolean = false
 ) : ASTNode {
 	override fun Context.codegenForThis(): Value {
-		val value = convert(defaultValue.codegen(), type)
-		declareVariable(name, value, isConst)
+		if (defaultValue == null) {
+			type ?: unclearVariable(name)
+			declareVariable(name, type.translate().undefined(), isConst)
+		} else
+			declareVariable(name, convert(defaultValue.codegen(), type), isConst)
 		return Value.Nothing
 	}
 

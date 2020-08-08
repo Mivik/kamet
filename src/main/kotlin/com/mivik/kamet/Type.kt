@@ -1,5 +1,6 @@
 package com.mivik.kamet
 
+import com.mivik.kamet.CastManager.explicitCast
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.global.LLVM
@@ -34,10 +35,40 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 
 	open fun dereference(): Type = this
 
-	fun undefined(): Value = Value(LLVM.LLVMGetUndef(llvm), this)
+	open fun Context.undefinedForThis(): Value = Value(LLVM.LLVMGetUndef(llvm), this@Type)
 
 	object Nothing : Type("Nothing", LLVM.LLVMVoidType())
 	object Unit : Type("Unit", LLVM.LLVMVoidType())
+
+	class Array(
+		val elementType: Type,
+		val size: Int,
+		val isConst: Boolean,
+		private val rawType: LLVMTypeRef = LLVM.LLVMArrayType(elementType.llvm, size)
+	) : Type(
+		"[${if (isConst) "const " else ""}$elementType, $size]",
+		elementType.pointer(isConst).llvm
+	) {
+		override fun Context.undefinedForThis(): Value =
+			Value(
+				LLVM.LLVMBuildBitCast(
+					builder,
+					allocate(rawType, "array"),
+					elementType.pointer(isConst).llvm,
+					"array_cast_to_pointer"
+				), this@Array
+			)
+
+		override fun equals(other: Any?): Boolean =
+			if (other is Array) elementType == other.elementType && size == other.size
+			else false
+
+		override fun hashCode(): Int {
+			var result = elementType.hashCode()
+			result = 31 * result + size
+			return result
+		}
+	}
 
 	class Function(val returnType: Type, val parameterTypes: List<Type>) : Type(
 		"$returnType(${parameterTypes.joinToString()})",

@@ -7,6 +7,7 @@ import org.bytedeco.javacpp.Pointer
 import org.bytedeco.llvm.LLVM.LLVMBasicBlockRef
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.LLVM.LLVMModuleRef
+import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
@@ -94,21 +95,28 @@ class Context(
 	internal inline fun TypeDescriptor.translate() = with(this) { translateForThis() }
 
 	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun Type.undefined() = with(this) { undefinedForThis() }
+
+	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun ASTNode.codegenUsing(block: LLVMBasicBlockRef): Value {
 		basicBlock = block
 		return codegen()
 	}
 
-	fun declareVariable(name: String, value: Value, isConst: Boolean = false): ValueRef {
-		if (value.type.canImplicitlyCastTo(Type.Unit)) return UnitValueRef(isConst)
+	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
 		val entryBlock = LLVM.LLVMGetEntryBasicBlock(function)
 		val tmpBuilder = LLVM.LLVMCreateBuilder()
 		LLVM.LLVMPositionBuilder(tmpBuilder, entryBlock, LLVM.LLVMGetFirstInstruction(entryBlock))
-		val address = LLVM.LLVMBuildAlloca(tmpBuilder, value.type.llvm, name)
-		val ret = ValueRef(address, value.type, isConst)
-		LLVM.LLVMSetValueName2(address, name, name.length.toLong())
+		val address = LLVM.LLVMBuildAlloca(tmpBuilder, type, name)
+		if (name != null) LLVM.LLVMSetValueName2(address, name, name.length.toLong())
 		LLVM.LLVMDisposeBuilder(tmpBuilder)
+		return address
+	}
+
+	fun declareVariable(name: String, value: Value, isConst: Boolean = false): ValueRef {
+		if (value.type.canImplicitlyCastTo(Type.Unit)) return UnitValueRef(isConst)
+		val ret = ValueRef(allocate(value.type.llvm, name), value.type, isConst)
 		declare(name, ret)
 		if (LLVM.LLVMIsUndef(value.llvm) == 0) ret.setValue(value)
 		return ret

@@ -23,6 +23,7 @@ internal object CastManager {
 	fun canImplicitlyCast(from: Type, to: Type) = allCases.any { it(from, to) }
 
 	private fun Context.implicitCastOrNull(from: Value, to: Type): Value? = when {
+		from.type == to -> from
 		from.type is Type.Reference -> implicitCastOrNull(from.dereference(), to)
 		from.type == Type.Nothing -> from.also { LLVM.LLVMBuildUnreachable(builder) }
 		case1(from.type, to) -> from

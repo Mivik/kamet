@@ -46,17 +46,20 @@ internal sealed class Token {
 	}
 }
 
-internal sealed class UnaryOp(val symbol: String) : Token() {
-	object Negative : UnaryOp("-")
-	object Inverse : UnaryOp("~")
-	object Not : UnaryOp("!")
-	object Increment : UnaryOp("++")
-	object Decrement : UnaryOp("--")
-	object Indirection : UnaryOp("*")
-	object AddressOf : UnaryOp("&")
+internal sealed class Operator(val symbol: String, val precedence: Int) : Token()
+
+internal sealed class UnaryOp(symbol: String, precedence: Int) : Operator(symbol, precedence) {
+	object Negative : UnaryOp("-", 12)
+	object Inverse : UnaryOp("~", 12)
+	object Not : UnaryOp("!", 12)
+	object Increment : UnaryOp("++", 12)
+	object Decrement : UnaryOp("--", 12)
+	object Indirection : UnaryOp("*", 12)
+	object AddressOf : UnaryOp("&", 12)
 }
 
-internal open class BinOp(val symbol: String, val precedence: Int, val returnBoolean: Boolean = false) : Token() {
+internal open class BinOp(symbol: String, precedence: Int, val returnBoolean: Boolean = false) :
+	Operator(symbol, precedence) {
 	internal open class BooOp(symbol: String, precedence: Int) : BinOp(symbol, precedence, true)
 	object Plus : BinOp("+", 9)
 	object Minus : BinOp("-", 9)

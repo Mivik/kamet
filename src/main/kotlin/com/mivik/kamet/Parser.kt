@@ -1,6 +1,7 @@
 package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
+import com.mivik.kamet.ast.ArraySubscriptNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
 import com.mivik.kamet.ast.CastNode
@@ -64,15 +65,31 @@ internal class Parser(private val lexer: Lexer) {
 	private fun unexpected(token: Token): Nothing = error("Unexpected $token")
 
 	private fun precedenceOf(token: Token) =
-		if (token is BinOp) token.precedence
-		else -1
+		when (token) {
+			is Operator -> token.precedence
+			Token.LeftBracket -> 13
+			else -> -1
+		}
+
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun makeOp(lhs: ASTNode?, rhs: ASTNode, op: Operator): ASTNode =
+		if (lhs == null) UnaryOpNode(
+			when (op) {
+				BinOp.Minus -> UnaryOp.Negative
+				BinOp.Multiply -> UnaryOp.Indirection
+				BinOp.BitwiseAnd -> UnaryOp.AddressOf
+				else -> expect()
+			}, rhs
+		)
+		else BinOpNode(lhs, rhs, op.expect())
 
 	// TODO Use stack to implement this.
-	private fun takeBinOp(precedence: Int, lhs: ASTNode): ASTNode {
+	private fun takeBinOp(precedence: Int, lhs: ASTNode?): ASTNode {
 		var currentLHS = lhs
 		while (true) {
 			val current = peek()
 			if (current == UnaryOp.Increment || current == UnaryOp.Decrement) {
+				currentLHS ?: error("Expected expression before postfix operator: $current")
 				take()
 				return UnaryOpNode(
 					current as UnaryOp,
@@ -80,16 +97,24 @@ internal class Parser(private val lexer: Lexer) {
 					true
 				)
 			}
+			if (current == Token.LeftBracket) {
+				take()
+				currentLHS ?: error("Expected expression before array subscript: $current")
+				currentLHS = ArraySubscriptNode(currentLHS, takeExpr())
+				take().expect<Token.RightBracket>()
+				continue
+			}
 			val currentPrecedence = precedenceOf(current)
-			if (currentPrecedence <= precedence) return currentLHS
+			if (currentPrecedence <= precedence) return currentLHS!!
 			take()
-			if (current == BinOp.As) currentLHS = CastNode(currentLHS, takeType())
+			if (current == BinOp.As) currentLHS =
+				CastNode(currentLHS ?: error("Expected expression before \"as\" operator: $current"), takeType())
 			else {
 				var rhs = takePrimary()
 				val nextPrecedence = precedenceOf(peek())
 				if (currentPrecedence < nextPrecedence)
 					rhs = takeBinOp(currentPrecedence, rhs)
-				currentLHS = BinOpNode(currentLHS, rhs, current.expect())
+				currentLHS = makeOp(currentLHS, rhs, current.expect())
 			}
 		}
 	}
@@ -126,11 +151,10 @@ internal class Parser(private val lexer: Lexer) {
 					IfNode(condition, thenBlock, takeBlockOrStmt())
 				} else IfNode(condition, thenBlock)
 			}
-			BinOp.Plus -> takeExpr() // just ignore it
-			is UnaryOp -> UnaryOpNode(token, takePrimary())
-			BinOp.Minus -> UnaryOpNode(UnaryOp.Negative, takePrimary())
-			BinOp.Multiply -> UnaryOpNode(UnaryOp.Indirection, takePrimary())
-			BinOp.BitwiseAnd -> UnaryOpNode(UnaryOp.AddressOf, takePrimary())
+			is UnaryOp, BinOp.Minus, BinOp.Multiply, BinOp.BitwiseAnd -> {
+				off(token)
+				takeBinOp(-1, null)
+			}
 			Token.SizeOf -> SizeOfNode(takeType())
 			else -> unexpected(token)
 		}
@@ -227,17 +251,28 @@ internal class Parser(private val lexer: Lexer) {
 
 	fun takeType(): TypeDescriptor =
 		when (val token = trimAndTake()) {
-			BinOp.BitwiseAnd -> {
+			BinOp.BitwiseAnd -> { // &(const )type
 				val isConst = peek() == Token.Const
 				if (isConst) take()
 				TypeDescriptor.Reference(takeType(), isConst)
 			}
-			BinOp.Multiply -> {
+			BinOp.Multiply -> { // *(const )type
 				val isConst = peek() == Token.Const
 				if (isConst) take()
 				TypeDescriptor.Pointer(takeType(), isConst)
 			}
 			Token.LeftParenthesis -> takeType().also { trimAndTake().expect<Token.RightParenthesis>() }
+			Token.LeftBracket -> { // [(const )type, size]
+				val elementType = takeType()
+				val isConst = peek() == Token.Const
+				if (isConst) take()
+				take().expect<Token.Comma>()
+				// TODO complex constant expression
+				val size = takeExpr().expect<ConstantNode>()
+				size.type.expect<Type.Primitive.Integral>()
+				take().expect<Token.RightBracket>()
+				TypeDescriptor.Array(elementType, size.value.toLongIgnoringOverflow().toInt(), isConst)
+			}
 			is Token.Identifier -> {
 				val type = TypeDescriptor.Named(token.name)
 				if (peek() == Token.LeftParenthesis) {

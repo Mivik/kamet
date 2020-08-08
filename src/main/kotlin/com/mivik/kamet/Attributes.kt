@@ -1,7 +1,7 @@
 package com.mivik.kamet
 
 enum class Attribute {
-	PACKED, NATIVE;
+	PACKED, NO_MANGLE;
 
 	companion object {
 		private val attributeMap by lazy { values().associateBy { it.name.toLowerCase() } }

@@ -27,9 +27,10 @@ private val reversedEscapeMap = escapeMap.entries.associate { it.value to it.key
 internal fun Char.escape(): Char = escapeMap.getOrElse(this) { throw IllegalStateException() }
 
 // Working replacement for https://github.com/Mivik/Kot/blob/master/src/main/kotlin/com/mivik/kot/Kot.kt#L13 (StringEscapeUtils.escapeForJava)
-internal fun String.escape(): String = fold(StringBuilder()) { sb, c ->
-	sb.append(reversedEscapeMap[c] ?: c)
-}.toString()
+internal fun String.escape(): String =
+	fold(StringBuilder()) { sb, c ->
+		reversedEscapeMap[c]?.let { sb.append('\\').append(it) } ?: sb.append(c)
+	}.toString()
 
 internal fun String.toLongIgnoringOverflow(): Long {
 	// drop((if (first() == '-') 1 else 0)).fold(0L) { acc, c -> acc*10 + (c-'0') }
@@ -38,7 +39,6 @@ internal fun String.toLongIgnoringOverflow(): Long {
 	for (i in start..lastIndex) acc = acc * 10 + (this[i] - '0')
 	return acc
 }
-
 
 internal fun BytePointer.toJava(): String =
 	string.also { LLVM.LLVMDisposeMessage(this) }
