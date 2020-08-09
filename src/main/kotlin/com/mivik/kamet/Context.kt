@@ -10,6 +10,9 @@ import org.bytedeco.llvm.LLVM.LLVMModuleRef
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 
 class Context(
 	val parent: Context?,
@@ -70,11 +73,24 @@ class Context(
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
 		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
 
-	inline var basicBlock: LLVMBasicBlockRef
-		get() = LLVM.LLVMGetInsertBlock(builder)
-		set(block) {
-			LLVM.LLVMPositionBuilderAtEnd(builder, block)
-		}
+	@Suppress("NOTHING_TO_INLINE")
+	inline fun insertAt(block: LLVMBasicBlockRef) {
+		LLVM.LLVMPositionBuilderAtEnd(builder, block)
+	}
+
+	inline val currentBlock get() = LLVM.LLVMGetInsertBlock(builder)
+
+	internal fun basicBlock(name: String = "block") = LLVM.LLVMAppendBasicBlock(llvmFunction, name)
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun br(block: LLVMBasicBlockRef) {
+		LLVM.LLVMBuildBr(builder, block)
+	}
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun condBr(condition: Value, thenBlock: LLVMBasicBlockRef, elseBlock: LLVMBasicBlockRef) {
+		LLVM.LLVMBuildCondBr(builder, condition.llvm, thenBlock, elseBlock)
+	}
 
 	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun ASTNode.codegen() = with(this) { codegenForThis() }
@@ -105,12 +121,6 @@ class Context(
 
 	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Type.sizeOf(): Value = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
-
-	@Suppress("NOTHING_TO_INLINE")
-	internal inline fun ASTNode.codegenUsing(block: LLVMBasicBlockRef): Value {
-		basicBlock = block
-		return codegen()
-	}
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
@@ -176,4 +186,30 @@ class Context(
 		return if (ret == 1) error.toJava()
 		else null
 	}
+}
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun Context.doInsideAndThen(
+	block: LLVMBasicBlockRef,
+	then: LLVMBasicBlockRef,
+	action: Context.() -> Unit
+) {
+	contract {
+		callsInPlace(action, InvocationKind.EXACTLY_ONCE)
+	}
+	br(block)
+	insertAt(block)
+	this.action()
+	insertAt(then)
+}
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun Context.doInside(block: LLVMBasicBlockRef, action: Context.() -> Unit): LLVMBasicBlockRef {
+	contract {
+		callsInPlace(action, InvocationKind.EXACTLY_ONCE)
+	}
+	val origin = currentBlock
+	insertAt(block)
+	this.action()
+	return LLVM.LLVMGetInsertBlock(builder).also { insertAt(origin) }
 }

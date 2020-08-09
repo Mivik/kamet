@@ -35,13 +35,19 @@ internal fun String.escape(): String =
 internal fun String.toLongIgnoringOverflow(): Long {
 	// drop((if (first() == '-') 1 else 0)).fold(0L) { acc, c -> acc*10 + (c-'0') }
 	var acc = 0L
-	val start = (if (first() == '-') 1 else 0)
+	val start = (first() == '-').toInt()
 	for (i in start..lastIndex) acc = acc * 10 + (this[i] - '0')
 	return acc
 }
 
 internal fun BytePointer.toJava(): String =
 	string.also { LLVM.LLVMDisposeMessage(this) }
+
+inline fun Boolean.ifThat(string: () -> String) =
+	if (this) string() else ""
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Boolean.toInt() = if (this) 1 else 0
 
 @OptIn(ExperimentalContracts::class)
 internal inline fun <reified T> Any?.expect(): T {

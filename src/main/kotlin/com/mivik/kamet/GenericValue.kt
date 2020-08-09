@@ -13,7 +13,7 @@ import org.bytedeco.llvm.global.LLVM.LLVMGenericValueToPointer
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun fromLong(type: Type, value: Long, signed: Boolean = true) =
-	LLVMCreateGenericValueOfInt(type.llvm, value, if (signed) 1 else 0)
+	LLVMCreateGenericValueOfInt(type.llvm, value, signed.toInt())
 
 class GenericValue(val llvm: LLVMGenericValueRef) {
 	constructor(value: Boolean) : this(fromLong(Primitive.Boolean, if (value) 1L else 0L, false))

@@ -12,8 +12,8 @@ internal class FunctionNode(
 		if (hasValue(prototype.functionName)) error("Redeclaration: ${prototype.functionName}")
 		val function = prototype.codegen()
 		LLVM.LLVMGetNamedFunction(module, prototype.name)
-		basicBlock = LLVM.LLVMAppendBasicBlock(function.llvm, "entry")
 		val sub = subContext(function)
+		insertAt(sub.basicBlock("entry"))
 		for ((i, parameter) in prototype.parameters.withIndex()) {
 			val (name, type) = parameter
 			sub.declare(name, type.translate().new(LLVM.LLVMGetParam(function.llvm, i)))

@@ -3,6 +3,7 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Context
 import com.mivik.kamet.TypeDescriptor
 import com.mivik.kamet.Value
+import com.mivik.kamet.ifThat
 import org.bytedeco.llvm.global.LLVM
 
 private fun Context.convert(value: Value, expected: TypeDescriptor? = null): Value {
@@ -33,7 +34,7 @@ internal class ValDeclareNode(
 		return Value.Nothing
 	}
 
-	override fun toString(): String = "val $name${if (type == null) "" else ": $type"} = $defaultValue"
+	override fun toString(): String = "val $name${(type==null).ifThat { ": $type" }} = $defaultValue"
 }
 
 internal class VarDeclareNode(
@@ -52,5 +53,5 @@ internal class VarDeclareNode(
 	}
 
 	override fun toString(): String =
-		"${if (isConst) "const " else ""}var $name${if (type == null) "" else ": $type"} = $defaultValue"
+		"${isConst.ifThat { "const " }}var $name${if (type == null) "" else ": $type"} = $defaultValue"
 }

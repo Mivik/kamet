@@ -6,6 +6,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.TypeDescriptor
 import com.mivik.kamet.Value
+import com.mivik.kamet.ifThat
 
 internal class StructNode(
 	attributes: Attributes,
@@ -26,4 +27,11 @@ internal class StructNode(
 		declareType(Type.Struct(name, elements.map { Pair(it.first, it.second.translate()) }, isPacked))
 		return Value.Nothing
 	}
+
+	override fun toString(): String =
+		"${isPacked.ifThat { "#[packed] " }}struct $name {${
+			elements.isNotEmpty().ifThat {
+				"\n\t" + elements.joinToString(",\n\t") { "${it.first}: ${it.second}" } + "\n"
+			}
+		}}"
 }

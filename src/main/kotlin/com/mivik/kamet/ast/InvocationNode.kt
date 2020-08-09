@@ -4,6 +4,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.canImplicitlyCastTo
+import com.mivik.kamet.ifThat
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.global.LLVM
 
@@ -38,7 +39,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 					arguments[it].implicitCast(parameterTypes[it]).llvm
 				}),
 				arguments.size,
-				if (type.returnType.canImplicitlyCastTo(Type.Unit)) "" else "${name}_result"
+				(!type.returnType.canImplicitlyCastTo(Type.Unit)).ifThat { "${name}_result" }
 			)
 		)
 	}

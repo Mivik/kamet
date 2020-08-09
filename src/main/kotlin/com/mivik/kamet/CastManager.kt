@@ -51,7 +51,7 @@ internal object CastManager {
 		implicitCastOrNull(from, to) ?: fail(from, to)
 
 	@Suppress("NOTHING_TO_INLINE")
-	inline fun fail(from: Value, to: Type): Nothing = error("Attempt to cast a ${from.type} to $to")
+	inline fun fail(from: Value, to: Type): Nothing = error("Attempt to cast a ${from.type} into $to")
 
 	fun Context.explicitCastOrNull(from: Value, dest: Type): Value? {
 		implicitCastOrNull(from, dest)?.let { return it }

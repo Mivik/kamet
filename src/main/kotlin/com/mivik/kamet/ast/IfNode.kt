@@ -2,52 +2,61 @@ package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
 import com.mivik.kamet.Value
-import org.bytedeco.llvm.global.LLVM
+import com.mivik.kamet.doInside
+import com.mivik.kamet.ifThat
 
 internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBlock: ASTNode? = null) : ASTNode {
 	override fun Context.codegenForThis(): Value {
 		val conditionValue = condition.codegen()
 		val function = llvmFunction
-		var thenBB = LLVM.LLVMAppendBasicBlock(function, "then")
-		var elseBB = LLVM.LLVMAppendBasicBlock(function, "else")
+		var thenBB = basicBlock("then")
+		var elseBB = basicBlock("else")
 		if (elseBlock == null) {
-			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, thenBB, elseBB)
-			thenBlock.codegenUsing(thenBB)
-			if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, elseBB)
-			basicBlock = elseBB
+			condBr(conditionValue, thenBB, elseBB)
+			insertAt(thenBB)
+			thenBlock.codegen()
+			if (!thenBlock.returned) br(elseBB)
+			insertAt(elseBB)
 			return Value.Nothing
 		} else { // if-else
-			val mergeBB = LLVM.LLVMAppendBasicBlock(function, "final")
-			LLVM.LLVMBuildCondBr(builder, conditionValue.llvm, thenBB, elseBB)
-			val thenRet = thenBlock.codegenUsing(thenBB)
-			thenBB = basicBlock
-			val elseRet = elseBlock.codegenUsing(elseBB)
-			elseBB = basicBlock
+			val mergeBB = basicBlock("merge")
+			condBr(conditionValue, thenBB, elseBB)
+			val thenRet: Value
+			val elseRet: Value
+			thenBB = doInside(thenBB) {
+				thenRet = thenBlock.codegen()
+			}
+			elseBB = doInside(elseBB) {
+				elseRet = elseBlock.codegen()
+			}
 			return if (thenRet.type == elseRet.type) { // when the whole if statement can be considered as a value
 				// TODO whether two types are equivalent is not equal to whether they are equal
 				val variable = declareVariable("if_result", thenRet.type.undefined())
-				basicBlock = thenBB
-				variable.setValue(thenRet)
-				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, mergeBB)
-				basicBlock = elseBB
-				variable.setValue(elseRet)
-				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, mergeBB)
-				basicBlock = mergeBB
+				doInside(thenBB) {
+					variable.setValue(thenRet)
+					if (!thenBlock.returned) br(mergeBB)
+				}
+				doInside(elseBB) {
+					variable.setValue(elseRet)
+					if (!elseBlock.returned) br(mergeBB)
+				}
+				insertAt(mergeBB)
 				variable.dereference()
 			} else { // this if is not a expression
-				basicBlock = thenBB
-				if (!thenBlock.returned) LLVM.LLVMBuildBr(builder, mergeBB)
-				basicBlock = elseBB
-				if (!elseBlock.returned) LLVM.LLVMBuildBr(builder, mergeBB)
-				basicBlock = mergeBB
+				doInside(thenBB) {
+					if (!thenBlock.returned) br(mergeBB)
+				}
+				doInside(elseBB) {
+					if (!elseBlock.returned) br(mergeBB)
+				}
+				insertAt(mergeBB)
 				Value.Nothing
 			}
 		}
 	}
 
 	override fun toString(): String =
-		if (elseBlock == null) "if $condition $thenBlock"
-		else "if ($condition) $thenBlock else $elseBlock"
+		"if ($condition) $thenBlock${(elseBlock != null).ifThat { " else $elseBlock" }}"
 
 	override val returned: Boolean
 		get() = thenBlock.returned && elseBlock != null && elseBlock.returned
