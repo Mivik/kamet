@@ -2,14 +2,13 @@ package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
-import com.mivik.kamet.Value
 import com.mivik.kamet.escape
 import com.mivik.kamet.toLongIgnoringOverflow
 import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
 internal class ConstantNode(val type: Type.Primitive, val value: String) : ASTNode {
-	override fun Context.codegenForThis() = Value(makeLLVMConst(), type)
+	override fun Context.codegenForThis() = type.new(makeLLVMConst())
 
 	@Suppress("NOTHING_TO_INLINE")
 	private inline fun makeLLVMConst(): LLVMValueRef {

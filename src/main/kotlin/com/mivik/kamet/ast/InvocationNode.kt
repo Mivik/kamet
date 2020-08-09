@@ -30,7 +30,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 		val function = findMatchingFunction(arguments)
 		val type = function.type as Type.Function
 		val parameterTypes = type.parameterTypes
-		return Value(
+		return type.returnType.new(
 			LLVM.LLVMBuildCall(
 				builder,
 				function.llvm,
@@ -39,7 +39,7 @@ internal class InvocationNode(val name: String, val elements: List<ASTNode>) : A
 				}),
 				arguments.size,
 				if (type.returnType.canImplicitlyCastTo(Type.Unit)) "" else "${name}_result"
-			), type.returnType
+			)
 		)
 	}
 

@@ -18,19 +18,19 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 				value = value.dereference()
 				val type = value.type
 				require(type is Type.Pointer) { "Indirection of a non-pointer type: ${value.type}" }
-				return ValueRef(value.llvm, type.originalType, type.isConst)
+				return ValueRef(value.llvm, type.elementType, type.isConst)
 			}
 			UnaryOp.AddressOf -> {
 				require(value is ValueRef) { "Taking the address of a val: ${value.type}" }
 				val type = value.type.expect<Type.Reference>()
-				return Value(value.llvm, type.originalType.pointer(type.isConst))
+				return type.originalType.pointer(type.isConst).new(value.llvm)
 			}
 			UnaryOp.Increment -> {
 				require(value is ValueRef && !value.isConst) { "Increment on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
 				val ret = if (after) value.dereference() else value
 				value.setValue(
-					Value(
+					originalType.new(
 						when (originalType) {
 							is Type.Primitive.Integral ->
 								LLVM.LLVMBuildAdd(
@@ -47,7 +47,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 									"increment"
 								)
 							else -> impossible()
-						}, originalType
+						}
 					)
 				)
 				return ret
@@ -57,7 +57,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 				val originalType = value.originalType
 				val ret = if (after) value.dereference() else value
 				value.setValue(
-					Value(
+					originalType.new(
 						when (originalType) {
 							is Type.Primitive.Integral ->
 								LLVM.LLVMBuildSub(
@@ -74,7 +74,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 									"decrement"
 								)
 							else -> impossible()
-						}, originalType
+						}
 					)
 				)
 				return ret
@@ -82,7 +82,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 			else -> {
 			}
 		}
-		return Value(
+		return value.type.new(
 			when (value.type) {
 				Type.Primitive.Boolean ->
 					when (op) {
@@ -101,7 +101,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 						else -> impossible()
 					}
 				else -> impossible()
-			}, value.type
+			}
 		)
 	}
 

@@ -10,29 +10,42 @@ typealias TPairPredicate = (Type, Type) -> Boolean
  * or ((A = [Type.Nothing]*) and (B is [Type.Pointer]))
  * or ((A is [Type.Reference]) and canImplicitlyCast(referenced type of A, B))
  * or (A = [Type.Nothing])
+ * or (A.isPointer) && (B.isPointer) && (A.pointedType = B.pointedType)
  *
  * Explicit cast is an extension to implicit cast
  */
 internal object CastManager {
 	private val case1: TPairPredicate = { a, b -> a == b }
-	private val case2: TPairPredicate = { a, b -> a is Type.Pointer && (a.originalType == Type.Nothing) && b.isPointer }
+	private val case2: TPairPredicate =
+		{ a, b -> a is Type.Pointer && (a.elementType == Type.Nothing) && b is Type.Pointer }
 	private val case3: TPairPredicate = { a, b -> a is Type.Reference && canImplicitlyCast(a.originalType, b) }
 	private val case4: TPairPredicate = { a, _ -> a == Type.Nothing }
-	private val allCases = arrayOf(case1, case2, case3, case4)
+	private val case5: TPairPredicate = { a, b ->
+		a.asPointerOrNull()?.let { aPointer ->
+			b.asPointerOrNull()?.let { bPointer ->
+				aPointer.elementType == bPointer.elementType
+			}
+		} ?: false
+	}
+	private val allCases = arrayOf(case1, case2, case3, case4, case5)
 
 	fun canImplicitlyCast(from: Type, to: Type) = allCases.any { it(from, to) }
 
-	private fun Context.implicitCastOrNull(from: Value, to: Type): Value? = when {
-		from.type == to -> from
-		from.type is Type.Reference -> implicitCastOrNull(from.dereference(), to)
-		from.type == Type.Nothing -> from.also { LLVM.LLVMBuildUnreachable(builder) }
-		case1(from.type, to) -> from
-		case2(from.type, to) -> Value(
-			LLVM.LLVMBuildBitCast(builder, from.llvm, to.llvm, "pointer_cast"),
-			type = to
-		)
-		else -> null
-	}
+	private fun Context.implicitCastOrNull(from: Value, to: Type): Value? =
+		when {
+			case1(from.type, to) -> from
+			case2(from.type, to) || case5(from.type, to) -> to.new(
+				LLVM.LLVMBuildBitCast(
+					builder,
+					from.llvm,
+					to.llvm,
+					"pointer_cast"
+				)
+			)
+			from.type is Type.Reference -> implicitCastOrNull(from.dereference(), to)
+			case4(from.type, to) -> from.also { LLVM.LLVMBuildUnreachable(builder) }
+			else -> null
+		}
 
 	fun Context.implicitCast(from: Value, to: Type): Value =
 		implicitCastOrNull(from, to) ?: fail(from, to)
@@ -42,17 +55,37 @@ internal object CastManager {
 
 	fun Context.explicitCastOrNull(from: Value, dest: Type): Value? {
 		implicitCastOrNull(from, dest)?.let { return it }
+		val fromIsPointer = from.type.isPointer
+		val destIsPointer = dest.isPointer
 		return when {
-			from.type.isReference -> explicitCastOrNull(from.dereference(), dest)
-			from.type.isPointer && dest.isPointer -> Value(
-				LLVM.LLVMBuildBitCast(
+			fromIsPointer && destIsPointer ->
+				dest.new(
+					LLVM.LLVMBuildBitCast(
+						builder,
+						from.llvm,
+						dest.llvm,
+						"pointer_cast"
+					)
+				)
+			fromIsPointer && dest is Type.Primitive.Integral ->
+				dest.new(
+					LLVM.LLVMBuildPtrToInt(
+						builder,
+						from.llvm,
+						dest.llvm,
+						"pointer_to_int"
+					)
+				)
+			from.type is Type.Primitive.Integral && destIsPointer -> dest.new(
+				LLVM.LLVMBuildIntToPtr(
 					builder,
 					from.llvm,
 					dest.llvm,
-					"pointer_cast"
-				), dest
+					"int_to_pointer"
+				)
 			)
-			from.type is Type.Primitive && dest is Type.Primitive -> Value(
+			from.type is Type.Reference -> explicitCastOrNull(from.dereference(), dest)
+			from.type is Type.Primitive && dest is Type.Primitive -> dest.new(
 				LLVM.LLVMBuildCast(
 					builder, when (val type = from.type) {
 						is Type.Primitive.Integral ->
@@ -81,7 +114,7 @@ internal object CastManager {
 							}
 						else -> TODO()
 					}, from.llvm, dest.llvm, "primitive_cast"
-				), type = dest
+				)
 			)
 			else -> null
 		}

@@ -41,7 +41,7 @@ internal class PrototypeNode(
 			val paramName = parameters[i].first
 			LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, i), paramName, paramName.length.toLong())
 		}
-		return Value(function, functionType).also { declareFunction(this@PrototypeNode, it) }
+		return functionType.new(function).also { declareFunction(this@PrototypeNode, it) }
 	}
 
 	override fun toString(): String =

@@ -80,7 +80,7 @@ internal open class BinOp(symbol: String, precedence: Int, val returnBoolean: Bo
 	object BitwiseOr : BinOp("|", 3)
 	object Xor : BinOp("^", 4)
 	object Assign : BinOp("=", 0)
-	object AccessMember : BinOp(".", 11)
+	object AccessMember : BinOp(".", 13)
 	object As : BinOp("as", 11)
 
 	open class AssignOperators(val originalOp: BinOp) : BinOp(originalOp.symbol + "=", 0)

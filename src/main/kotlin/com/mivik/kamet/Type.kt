@@ -1,8 +1,8 @@
 package com.mivik.kamet
 
-import com.mivik.kamet.CastManager.explicitCast
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
+import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 
 sealed class Type(val name: String, val llvm: LLVMTypeRef) {
@@ -29,13 +29,21 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 				for (type in defaultTypes)
 					this[type.name] = type
 			}
+
+		val pointerAddressType = Primitive.Integral.ULong
 	}
 
 	override fun toString(): String = name
 
 	open fun dereference(): Type = this
 
-	open fun Context.undefinedForThis(): Value = Value(LLVM.LLVMGetUndef(llvm), this@Type)
+	fun Context.undefinedForThis(): Value = new(LLVM.LLVMGetUndef(llvm))
+
+	open fun Context.newForThis(llvm: LLVMValueRef, isConst: Boolean): Value = Value(llvm, this@Type)
+
+	inline val isPointer get() = asPointerOrNull() != null
+
+	open fun asPointerOrNull(): Pointer? = null
 
 	object Nothing : Type("Nothing", LLVM.LLVMVoidType())
 	object Unit : Type("Unit", LLVM.LLVMVoidType())
@@ -43,22 +51,11 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 	class Array(
 		val elementType: Type,
 		val size: Int,
-		val isConst: Boolean,
-		private val rawType: LLVMTypeRef = LLVM.LLVMArrayType(elementType.llvm, size)
+		val isConst: Boolean
 	) : Type(
 		"[${if (isConst) "const " else ""}$elementType, $size]",
-		elementType.pointer(isConst).llvm
+		LLVM.LLVMArrayType(elementType.llvm, size)
 	) {
-		override fun Context.undefinedForThis(): Value =
-			Value(
-				LLVM.LLVMBuildBitCast(
-					builder,
-					allocate(rawType, "array"),
-					elementType.pointer(isConst).llvm,
-					"array_cast_to_pointer"
-				), this@Array
-			)
-
 		override fun equals(other: Any?): Boolean =
 			if (other is Array) elementType == other.elementType && size == other.size
 			else false
@@ -139,6 +136,10 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 			require(originalType !is Reference) { "Creating a reference of a reference" }
 		}
 
+		override fun asPointerOrNull(): Pointer? =
+			if (originalType is Array) originalType.elementType.pointer(originalType.isConst)
+			else null
+
 		override fun dereference(): Type = originalType
 
 		override fun equals(other: Any?): Boolean =
@@ -149,32 +150,28 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 		override fun hashCode(): Int = originalType.hashCode()
 	}
 
-	class Pointer(val originalType: Type, val isConst: Boolean) :
-		Type("*${if (isConst) "const " else ""}($originalType)", originalType.llvm.pointer()) {
+	class Pointer(val elementType: Type, val isConst: Boolean) :
+		Type("*${if (isConst) "const " else ""}($elementType)", elementType.llvm.pointer()) {
 		init {
-			require(originalType !is Reference) { "Creating a pointer to a reference" }
+			require(elementType !is Reference) { "Creating a pointer to a reference" }
 		}
+
+		override fun asPointerOrNull(): Pointer? = this
 
 		override fun equals(other: Any?): Boolean =
 			if (other is Pointer)
-				isConst == other.isConst && originalType == other.originalType
+				isConst == other.isConst && elementType == other.elementType
 			else false
 
-		override fun hashCode(): Int = originalType.hashCode()
+		override fun hashCode(): Int = elementType.hashCode()
 	}
 }
-
-internal inline val Type.isReference get() = this is Type.Reference
-internal inline val Type.isPointer get() = this is Type.Pointer
 
 @Suppress("NOTHING_TO_INLINE")
 internal inline fun <T> Type.Primitive.Integral.foldSign(signed: T, unsigned: T) = if (this.signed) signed else unsigned
 
 @Suppress("NOTHING_TO_INLINE")
-inline fun Type.reference(isConst: Boolean = false): Type = Type.Reference(this, isConst)
+inline fun Type.reference(isConst: Boolean = false) = Type.Reference(this, isConst)
 
 @Suppress("NOTHING_TO_INLINE")
-inline fun Type.pointer(isConst: Boolean = false): Type = Type.Pointer(this, isConst)
-
-@Suppress("NOTHING_TO_INLINE")
-inline fun Type.nullPointer(): Value = pointer().let { Value(LLVM.LLVMConstNull(it.llvm), it) }
+inline fun Type.pointer(isConst: Boolean = false) = Type.Pointer(this, isConst)

@@ -4,6 +4,7 @@ import com.mivik.kamet.ast.BlockNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
+import org.bytedeco.llvm.global.LLVM
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -22,7 +23,10 @@ internal class KametTest {
 					it.elements += ReturnNode(block)
 				}
 			).let { with(context) { it.codegen() } }
-			context.verify()?.let { msg -> error("Verification failed: $msg") }
+			context.verify()?.let { msg ->
+				context.dump()
+				error("Verification failed: $msg")
+			}
 			val engine = JITEngine(context)
 			val result = engine.run(functionName)
 			engine.dispose()
@@ -112,15 +116,39 @@ internal class KametTest {
 	@Test
 	fun testArray() {
 		assertEquals(
-			1576285,
+			6310,
 			"""
-				val x: [Int, 5]
+				const var x: [Int, 5]
 				val first: &Int = x[0]
 				first = 1926
 				val second: *Int = &x[1]
 				*second = 817
-				x[0]+x[1]+x[0]*x[1]
+				val third: *Int = second+1
+				*third = 2333
+				val forth: *Int = x+3
+				*forth = 1234
+				x[0]+x[1]+x[2]+x[3]
 			""".trimIndent().evaluate(Type.Primitive.Integral.Int).int
+		)
+		assertEquals(
+			356,
+			"""
+				struct Test {
+					a: [Int, 5],
+					b: [Double, 10]
+				}
+				
+				#[no_mangle] fun test(): Double {
+					var test: Test
+					val intPointer: *Int = test.a
+					intPointer[0] = 123
+					val doublePointer: *Double = test.b
+					doublePointer[1] = 233.5
+					return test.a[0]+test.b[1]
+				}
+			""".trimIndent().compile().run {
+				run("test").double.also { dispose() }
+			}.toInt()
 		)
 	}
 }

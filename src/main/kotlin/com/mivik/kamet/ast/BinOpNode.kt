@@ -15,7 +15,6 @@ import org.bytedeco.llvm.global.LLVM.LLVMAdd
 import org.bytedeco.llvm.global.LLVM.LLVMAnd
 import org.bytedeco.llvm.global.LLVM.LLVMBuildAnd
 import org.bytedeco.llvm.global.LLVM.LLVMBuildBinOp
-import org.bytedeco.llvm.global.LLVM.LLVMBuildExtractValue
 import org.bytedeco.llvm.global.LLVM.LLVMBuildFCmp
 import org.bytedeco.llvm.global.LLVM.LLVMBuildFPExt
 import org.bytedeco.llvm.global.LLVM.LLVMBuildFPToSI
@@ -24,7 +23,7 @@ import org.bytedeco.llvm.global.LLVM.LLVMBuildICmp
 import org.bytedeco.llvm.global.LLVM.LLVMBuildOr
 import org.bytedeco.llvm.global.LLVM.LLVMBuildSExt
 import org.bytedeco.llvm.global.LLVM.LLVMBuildSIToFP
-import org.bytedeco.llvm.global.LLVM.LLVMBuildStructGEP
+import org.bytedeco.llvm.global.LLVM.LLVMBuildStructGEP2
 import org.bytedeco.llvm.global.LLVM.LLVMBuildUIToFP
 import org.bytedeco.llvm.global.LLVM.LLVMBuildZExt
 import org.bytedeco.llvm.global.LLVM.LLVMFAdd
@@ -62,13 +61,9 @@ import org.bytedeco.llvm.global.LLVM.LLVMXor
 internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : ASTNode {
 	private fun unifyOperandTypes(lhsType: Type, rhsType: Type): Type =
 		if (lhsType !is Primitive || rhsType !is Primitive) TODO()
-		else if (lhsType == rhsType &&
-			lhsType in arrayOf(
-				Primitive.Real.Double,
-				Primitive.Real.Float,
-				Primitive.Boolean
-			)
-		) lhsType
+		else if (lhsType == Primitive.Real.Double || rhsType == Primitive.Real.Double) Primitive.Real.Double
+		else if (lhsType == Primitive.Real.Float || rhsType == Primitive.Real.Float) Primitive.Real.Float
+		else if (lhsType == Primitive.Boolean && rhsType == Primitive.Boolean) Primitive.Boolean
 		else { // bit size first
 			val lhsTypedI = lhsType as Primitive.Integral
 			val lb = lhsTypedI.sizeInBits
@@ -112,12 +107,12 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 			}
 			else -> fail()
 		}
-		return Value(coercion, type)
+		return type.new(coercion)
 	}
 
 	override fun Context.codegenForThis(): Value {
 		val lv = lhs.codegen()
-		val rv = rhs.codegen()
+		val rv by lazy { rhs.codegen() }
 		fun lhsMustValueRef(): ValueRef {
 			require(lv is ValueRef && !lv.isConst) { "Assigning to a non-reference type: ${lv.type}" }
 			return lv
@@ -125,9 +120,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 
 		return when (op) {
 			is BinOp.AssignOperators -> {
-				lhsMustValueRef().setValue(
-					arithmeticCodegen(lv.dereference(), rv.dereference(), op.originalOp)
-				)
+				lhsMustValueRef().setValue(arithmeticCodegen(lv.dereference(), rv.dereference(), op.originalOp))
 				lv
 			}
 			BinOp.Assign -> {
@@ -138,39 +131,73 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 			}
 			BinOp.AccessMember -> {
 				require(rhs is ValueNode) { "Expected a member name, got $rhs" }
-				when (val type = lv.type) {
-					is Type.Struct -> {
-						val index = type.memberIndex(rhs.name)
-						Value(
-							LLVMBuildExtractValue(builder, lv.llvm, index, "access_member"),
-							type.memberType(index)
-						)
-					}
-					is Type.Reference -> {
-						val originStruct = type.originalType.expect<Type.Struct>()
-						val index = originStruct.memberIndex(rhs.name)
-						ValueRef(
-							LLVMBuildStructGEP(builder, lv.llvm, index, "access_member"),
-							originStruct.memberType(index),
-							type.isConst
-						)
-					}
-					else -> TODO("branches for more types, and extension")
-				}
+				val type = lv.type.expect<Type.Reference>()
+				val originStruct = type.originalType.expect<Type.Struct>()
+				val index = originStruct.memberIndex(rhs.name)
+				ValueRef(
+					LLVMBuildStructGEP2(builder, originStruct.llvm, lv.llvm, index, "access_member"),
+					originStruct.memberType(index),
+					type.isConst
+				)
 			}
-			else -> arithmeticCodegen(lv.dereference(), rv.dereference(), op)
+			else -> arithmeticCodegen(lv, rv, op)
 		}
 	}
 
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun checkPointerOperation(op: BinOp) =
+		require(op == BinOp.Plus || op == BinOp.Minus) { "$op is not allowed between pointers and integral." }
+
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun Context.pointerArithmeticCodegen(lhs: Value, rhs: Value, op: BinOp): Value {
+		val lhsPointer = lhs.type.asPointerOrNull()
+		val rhsPointer = rhs.type.asPointerOrNull()
+		return when {
+			lhsPointer != null && rhsPointer != null -> {
+				require(op == BinOp.Minus) { "$op is not allowed between two pointers." }
+				require(lhsPointer.elementType == rhsPointer.elementType) { "Subtraction between two incompatible pointer types: ${lhs.type} and ${rhs.type}" }
+				arithmeticCodegen(
+					arithmeticCodegen(lhs.pointerToInt(), rhs.pointerToInt(), BinOp.Minus),
+					lhsPointer.elementType.sizeOf(),
+					BinOp.Divide
+				)
+			}
+			lhsPointer != null -> {
+				rhs.type.expect<Primitive.Integral>()
+				checkPointerOperation(op)
+				arithmeticCodegen(
+					lhs.pointerToInt(),
+					arithmeticCodegen(rhs, lhsPointer.elementType.sizeOf(), BinOp.Multiply),
+					op
+				).explicitCast(lhs.type)
+			}
+			rhsPointer != null -> {
+				lhs.type.expect<Primitive.Integral>()
+				checkPointerOperation(op)
+				arithmeticCodegen(
+					arithmeticCodegen(lhs, rhsPointer.elementType.sizeOf(), BinOp.Multiply),
+					rhs.pointerToInt(),
+					op
+				).explicitCast(rhs.type)
+			}
+			else -> impossible()
+		}
+	}
+
+	@Suppress("NAME_SHADOWING")
 	private fun Context.arithmeticCodegen(lhs: Value, rhs: Value, op: BinOp): Value {
-		val operandType = unifyOperandTypes(lhs.type, rhs.type)
+		if (lhs.type.isPointer || rhs.type.isPointer)
+			return pointerArithmeticCodegen(lhs, rhs, op)
+		val lhs = lhs.dereference()
+		val rhs = rhs.dereference()
+		val resultType = unifyOperandTypes(lhs.type, rhs.type)
 		val type =
 			if (op.returnBoolean) Primitive.Boolean
-			else operandType
-		val lhsValue = lift(lhs, operandType).llvm
-		val rhsValue = lift(rhs, operandType).llvm
-		if (operandType == Primitive.Boolean) {
-			return Value(
+			else resultType
+		val lhsValue = lift(lhs, resultType).llvm
+		val rhsValue = lift(rhs, resultType).llvm
+		if (resultType == Primitive.Boolean) {
+			return Primitive.Boolean.new(
 				when (op) {
 					BinOp.And -> LLVMBuildAnd(builder, lhsValue, rhsValue, "and")
 					BinOp.Or -> LLVMBuildOr(builder, lhsValue, rhsValue, "or")
@@ -186,21 +213,21 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 								else -> impossible()
 							}, lhsValue, rhsValue, "boolean_cmp"
 						)
-				}, Primitive.Boolean
+				}
 			)
 		}
 		return if (op.returnBoolean) // comparision
-			Value(
-				when (operandType) {
+			Primitive.Boolean.new(
+				when (resultType) {
 					is Primitive.Integral -> {
 						LLVMBuildICmp(
 							builder, when (op) {
 								BinOp.Equal -> LLVMIntEQ
 								BinOp.NotEqual -> LLVMIntNE
-								BinOp.Less -> operandType.foldSign(LLVMIntSLT, LLVMIntULT)
-								BinOp.LessOrEqual -> operandType.foldSign(LLVMIntSLE, LLVMIntULE)
-								BinOp.Greater -> operandType.foldSign(LLVMIntSGT, LLVMIntUGT)
-								BinOp.GreaterOrEqual -> operandType.foldSign(LLVMIntSGE, LLVMIntUGE)
+								BinOp.Less -> resultType.foldSign(LLVMIntSLT, LLVMIntULT)
+								BinOp.LessOrEqual -> resultType.foldSign(LLVMIntSLE, LLVMIntULE)
+								BinOp.Greater -> resultType.foldSign(LLVMIntSGT, LLVMIntUGT)
+								BinOp.GreaterOrEqual -> resultType.foldSign(LLVMIntSGE, LLVMIntUGE)
 								else -> impossible()
 							}, lhsValue, rhsValue, "integer_cmp"
 						)
@@ -217,9 +244,9 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 						}, lhsValue, rhsValue, "real_cmp"
 					)
 					else -> impossible()
-				}, Primitive.Boolean
+				}
 			)
-		else Value(
+		else type.new(
 			when (type) {
 				is Primitive.Integral ->
 					LLVMBuildBinOp(
@@ -249,7 +276,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 						}, lhsValue, rhsValue, "real_binop"
 					)
 				else -> impossible()
-			}, type
+			}
 		)
 	}
 

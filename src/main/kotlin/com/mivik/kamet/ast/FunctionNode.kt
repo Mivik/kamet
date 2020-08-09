@@ -16,7 +16,7 @@ internal class FunctionNode(
 		val sub = subContext(function)
 		for ((i, parameter) in prototype.parameters.withIndex()) {
 			val (name, type) = parameter
-			sub.declare(name, Value(LLVM.LLVMGetParam(function.llvm, i), type.translate()))
+			sub.declare(name, type.translate().new(LLVM.LLVMGetParam(function.llvm, i)))
 		}
 		with(sub) { body.codegen() }
 		declare(prototype.name, function)

@@ -1,7 +1,6 @@
 package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
-import com.mivik.kamet.ast.ArraySubscriptNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
 import com.mivik.kamet.ast.CastNode
@@ -10,6 +9,7 @@ import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.InvocationNode
+import com.mivik.kamet.ast.PointerSubscriptNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
 import com.mivik.kamet.ast.SizeOfNode
@@ -100,7 +100,7 @@ internal class Parser(private val lexer: Lexer) {
 			if (current == Token.LeftBracket) {
 				take()
 				currentLHS ?: error("Expected expression before array subscript: $current")
-				currentLHS = ArraySubscriptNode(currentLHS, takeExpr())
+				currentLHS = PointerSubscriptNode(currentLHS, takeExpr())
 				take().expect<Token.RightBracket>()
 				continue
 			}
@@ -121,7 +121,7 @@ internal class Parser(private val lexer: Lexer) {
 
 	private fun takePrimary(): ASTNode =
 		when (val token = trimAndTake()) {
-			is Token.Null -> Type.Nothing.nullPointer().direct()
+			is Token.Null -> Value.NullPointer.direct()
 			is Token.Identifier ->
 				if (peek() == Token.LeftParenthesis) {
 					take()

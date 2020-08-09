@@ -98,6 +98,15 @@ class Context(
 	internal inline fun Type.undefined() = with(this) { undefinedForThis() }
 
 	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun Type.new(llvm: LLVMValueRef, isConst: Boolean = false) = newForThis(llvm, isConst)
+
+	@Suppress("NOTHING_TO_INLINE")
+	internal inline fun Type.sizeOf(): Value = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
+
+	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun ASTNode.codegenUsing(block: LLVMBasicBlockRef): Value {
 		basicBlock = block
 		return codegen()
@@ -152,6 +161,10 @@ class Context(
 		LLVM.LLVMAddCFGSimplificationPass(pass)
 		LLVM.LLVMRunPassManager(pass, module)
 		LLVM.LLVMDisposePassManager(pass)
+	}
+
+	fun dump() {
+		LLVM.LLVMDumpModule(module)
 	}
 
 	/**

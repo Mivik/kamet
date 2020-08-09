@@ -33,7 +33,7 @@ internal class ValDeclareNode(
 		return Value.Nothing
 	}
 
-	override fun toString(): String = "val $name = $defaultValue"
+	override fun toString(): String = "val $name${if (type == null) "" else ": $type"} = $defaultValue"
 }
 
 internal class VarDeclareNode(
@@ -51,5 +51,6 @@ internal class VarDeclareNode(
 		return Value.Nothing
 	}
 
-	override fun toString(): String = "var $name = $defaultValue"
+	override fun toString(): String =
+		"${if (isConst) "const " else ""}var $name${if (type == null) "" else ": $type"} = $defaultValue"
 }
