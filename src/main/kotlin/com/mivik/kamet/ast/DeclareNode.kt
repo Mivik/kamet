@@ -34,7 +34,7 @@ internal class ValDeclareNode(
 		return Value.Nothing
 	}
 
-	override fun toString(): String = "val $name${(type==null).ifThat { ": $type" }} = $defaultValue"
+	override fun toString(): String = "val $name${(type == null).ifThat { ": $type" }} = $defaultValue"
 }
 
 internal class VarDeclareNode(

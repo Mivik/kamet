@@ -24,7 +24,7 @@ private val escapeMap = mapOf(
 	'0' to '\u0000'
 )
 private val reversedEscapeMap = escapeMap.entries.associate { it.value to it.key }
-internal fun Char.escape(): Char = escapeMap.getOrElse(this) { throw IllegalStateException() }
+internal fun Char.escape(): Char = escapeMap.getOrElse(this) { throw IllegalEscapeException(this) }
 
 // Working replacement for https://github.com/Mivik/Kot/blob/master/src/main/kotlin/com/mivik/kot/Kot.kt#L13 (StringEscapeUtils.escapeForJava)
 internal fun String.escape(): String =
@@ -33,7 +33,6 @@ internal fun String.escape(): String =
 	}.toString()
 
 internal fun String.toLongIgnoringOverflow(): Long {
-	// drop((if (first() == '-') 1 else 0)).fold(0L) { acc, c -> acc*10 + (c-'0') }
 	var acc = 0L
 	val start = (first() == '-').toInt()
 	for (i in start..lastIndex) acc = acc * 10 + (this[i] - '0')

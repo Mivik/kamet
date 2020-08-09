@@ -171,8 +171,9 @@ internal class Parser(private val lexer: Lexer) {
 			else -> takeStmt()
 		}
 
-	fun takeStmt(): ASTNode =
+	tailrec fun takeStmt(): ASTNode =
 		when (trimAndPeek()) {
+			Token.Struct -> takeStruct()
 			Token.Val -> {
 				take()
 				val name = take().expect<Token.Identifier>().name
@@ -229,6 +230,10 @@ internal class Parser(private val lexer: Lexer) {
 				val condition = takeExpr()
 				take().expect<Token.RightParenthesis>()
 				DoWhileNode(block, condition)
+			}
+			Token.NumberSign -> {
+				lastAttribute = takeAttributes()
+				takeStmt()
 			}
 			else -> takeExpr()
 		}

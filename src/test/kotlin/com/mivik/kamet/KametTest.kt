@@ -54,7 +54,7 @@ internal class KametTest {
 	private inline fun String.tryCompile() = compile().dispose()
 
 	@Test
-	fun testUnsigned() {
+	fun `unsigned values`() {
 		assertEquals(
 			1001,
 			"1U+2*500".evaluate(Type.Primitive.Integral.UInt).int
@@ -70,7 +70,7 @@ internal class KametTest {
 	}
 
 	@Test
-	fun testUndefined() {
+	fun undefined() {
 		"""
 			#[no_mangle] fun main(): Int {
 				val x: Int
@@ -80,7 +80,7 @@ internal class KametTest {
 	}
 
 	@Test
-	fun testFIB() {
+	fun fibonacci() {
 		val engine = """
 			#[no_mangle] fun fib(x: Int): Int {
 				if (x<=2) return 1
@@ -114,7 +114,7 @@ internal class KametTest {
 	}
 
 	@Test
-	fun testArray() {
+	fun array() {
 		assertEquals(
 			6310,
 			"""
@@ -150,5 +150,18 @@ internal class KametTest {
 				run("test").double.also { dispose() }
 			}.toInt()
 		)
+	}
+
+	@Test
+	fun `struct in function`() {
+		"""
+			fun test() {
+				struct A {
+					a: Int,
+					b: Double
+				}
+				val a: A
+			}
+		""".trimIndent().tryCompile()
 	}
 }

@@ -10,7 +10,7 @@ open class ValueRef(address: LLVMValueRef, val originalType: Type, val isConst: 
 	}
 
 	override fun Context.dereferenceForThis(): Value =
-		originalType.new(LLVM.LLVMBuildLoad(builder, llvm, "load"), isConst)
+		originalType.new(LLVM.LLVMBuildLoad(builder, llvm, "load"))
 }
 
 class UnitValueRef(isConst: Boolean) : ValueRef(NullPointer.llvm, Type.Unit, isConst) {

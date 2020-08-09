@@ -8,7 +8,6 @@ import com.mivik.kamet.ifThat
 internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBlock: ASTNode? = null) : ASTNode {
 	override fun Context.codegenForThis(): Value {
 		val conditionValue = condition.codegen()
-		val function = llvmFunction
 		var thenBB = basicBlock("then")
 		var elseBB = basicBlock("else")
 		if (elseBlock == null) {

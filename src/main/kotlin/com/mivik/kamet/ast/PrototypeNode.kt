@@ -6,6 +6,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.TypeDescriptor
 import com.mivik.kamet.Value
+import com.mivik.kamet.ifThat
 import org.bytedeco.llvm.global.LLVM
 
 internal class PrototypeNode(
@@ -14,7 +15,9 @@ internal class PrototypeNode(
 	val returnType: TypeDescriptor,
 	val parameters: List<Pair<String, TypeDescriptor>>
 ) : ASTNode {
-	val mangled: String
+	val noMangle: Boolean
+
+	inline val mangledName: String
 		get() = "$name(${parameters.joinToString(",") { "${it.second}" }}):$returnType"
 
 	val functionName: String
@@ -26,7 +29,13 @@ internal class PrototypeNode(
 				Attribute.NO_MANGLE -> functionName = name
 				else -> attr.notApplicableTo("Prototype")
 			}
-		this.functionName = functionName ?: mangled
+		if (functionName == null) {
+			this.functionName = mangledName
+			noMangle = false
+		} else {
+			this.functionName = functionName
+			noMangle = true
+		}
 	}
 
 	override fun Context.codegenForThis(): Value {
@@ -45,5 +54,5 @@ internal class PrototypeNode(
 	}
 
 	override fun toString(): String =
-		"fun $name(${parameters.joinToString { "${it.first}: ${it.second}" }}): $returnType"
+		"${noMangle.ifThat { "#[no_mangle] " }}fun $name(${parameters.joinToString { "${it.first}: ${it.second}" }}): $returnType"
 }

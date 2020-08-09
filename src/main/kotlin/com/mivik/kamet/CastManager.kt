@@ -85,37 +85,39 @@ internal object CastManager {
 				)
 			)
 			from.type is Type.Reference -> explicitCastOrNull(from.dereference(), dest)
-			from.type is Type.Primitive && dest is Type.Primitive -> dest.new(
-				LLVM.LLVMBuildCast(
-					builder, when (val type = from.type) {
-						is Type.Primitive.Integral ->
-							when (dest) {
-								is Type.Primitive.Integral ->
-									if (type.sizeInBits > dest.sizeInBits) LLVM.LLVMTrunc
-									else type.foldSign(LLVM.LLVMSExt, LLVM.LLVMZExt)
-								is Type.Primitive.Real -> type.foldSign(LLVM.LLVMSIToFP, LLVM.LLVMUIToFP)
-								is Type.Primitive.Boolean -> LLVM.LLVMTrunc
-							}
-						is Type.Primitive.Real ->
-							when (dest) {
-								is Type.Primitive.Integral -> dest.foldSign(LLVM.LLVMFPToSI, LLVM.LLVMFPToUI)
-								is Type.Primitive.Real -> when {
-									type.sizeInBits > dest.sizeInBits -> LLVM.LLVMFPTrunc
-									type.sizeInBits <= dest.sizeInBits -> LLVM.LLVMFPExt
+			from.type is Type.Primitive && dest is Type.Primitive -> {
+				val type = from.type
+				dest.new(
+					LLVM.LLVMBuildCast(
+						builder, when (type) {
+							is Type.Primitive.Integral ->
+								when (dest) {
+									is Type.Primitive.Integral ->
+										if (type.sizeInBits > dest.sizeInBits) LLVM.LLVMTrunc
+										else type.foldSign(LLVM.LLVMSExt, LLVM.LLVMZExt)
+									is Type.Primitive.Real -> type.foldSign(LLVM.LLVMSIToFP, LLVM.LLVMUIToFP)
+									is Type.Primitive.Boolean -> LLVM.LLVMTrunc
+								}
+							is Type.Primitive.Real ->
+								when (dest) {
+									is Type.Primitive.Integral -> dest.foldSign(LLVM.LLVMFPToSI, LLVM.LLVMFPToUI)
+									is Type.Primitive.Real -> when {
+										type.sizeInBits > dest.sizeInBits -> LLVM.LLVMFPTrunc
+										type.sizeInBits <= dest.sizeInBits -> LLVM.LLVMFPExt
+										else -> impossible()
+									}
+									else -> fail(from, dest)
+								}
+							is Type.Primitive.Boolean ->
+								when (dest) {
+									is Type.Primitive.Integral -> dest.foldSign(LLVM.LLVMSExt, LLVM.LLVMZExt)
+									is Type.Primitive.Real -> LLVM.LLVMUIToFP
 									else -> impossible()
 								}
-								else -> fail(from, dest)
-							}
-						is Type.Primitive.Boolean ->
-							when (dest) {
-								is Type.Primitive.Integral -> dest.foldSign(LLVM.LLVMSExt, LLVM.LLVMZExt)
-								is Type.Primitive.Real -> LLVM.LLVMUIToFP
-								else -> impossible()
-							}
-						else -> TODO()
-					}, from.llvm, dest.llvm, "primitive_cast"
+						}, from.llvm, dest.llvm, "primitive_cast"
+					)
 				)
-			)
+			}
 			else -> null
 		}
 	}

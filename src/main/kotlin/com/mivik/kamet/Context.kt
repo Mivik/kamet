@@ -111,13 +111,7 @@ class Context(
 	internal inline fun TypeDescriptor.translate() = with(this) { translateForThis() }
 
 	@Suppress("NOTHING_TO_INLINE")
-	internal inline fun Type.undefined() = with(this) { undefinedForThis() }
-
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
-
-	@Suppress("NOTHING_TO_INLINE")
-	internal inline fun Type.new(llvm: LLVMValueRef, isConst: Boolean = false) = newForThis(llvm, isConst)
 
 	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Type.sizeOf(): Value = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))

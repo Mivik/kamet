@@ -37,9 +37,9 @@ sealed class Type(val name: String, val llvm: LLVMTypeRef) {
 
 	open fun dereference(): Type = this
 
-	fun Context.undefinedForThis(): Value = new(LLVM.LLVMGetUndef(llvm))
+	fun undefined(): Value = new(LLVM.LLVMGetUndef(llvm))
 
-	open fun Context.newForThis(llvm: LLVMValueRef, isConst: Boolean): Value = Value(llvm, this@Type)
+	fun new(llvm: LLVMValueRef): Value = Value(llvm, this)
 
 	inline val isPointer get() = asPointerOrNull() != null
 
