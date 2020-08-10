@@ -16,7 +16,7 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 			thenBlock.codegen()
 			if (!thenBlock.returned) br(elseBB)
 			insertAt(elseBB)
-			return Value.Nothing
+			return Value.Unit
 		} else { // if-else
 			val mergeBB = basicBlock("merge")
 			condBr(conditionValue, thenBB, elseBB)

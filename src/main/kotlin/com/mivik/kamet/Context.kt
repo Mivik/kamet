@@ -14,6 +14,7 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
+@Suppress("NOTHING_TO_INLINE")
 class Context(
 	val parent: Context?,
 	val module: LLVMModuleRef,
@@ -22,7 +23,7 @@ class Context(
 	private val valueMap: MutableMap<String, Value>,
 	private val typeMap: MutableMap<String, Type>,
 	private val functionMap: MutableMap<String, MutableList<Value>>
-) {
+) : Disposable {
 	companion object {
 		fun topLevel(moduleName: String): Context =
 			Context(
@@ -73,7 +74,6 @@ class Context(
 	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
 		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
 
-	@Suppress("NOTHING_TO_INLINE")
 	inline fun insertAt(block: LLVMBasicBlockRef) {
 		LLVM.LLVMPositionBuilderAtEnd(builder, block)
 	}
@@ -82,38 +82,28 @@ class Context(
 
 	internal fun basicBlock(name: String = "block") = LLVM.LLVMAppendBasicBlock(llvmFunction, name)
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun br(block: LLVMBasicBlockRef) {
 		LLVM.LLVMBuildBr(builder, block)
 	}
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun condBr(condition: Value, thenBlock: LLVMBasicBlockRef, elseBlock: LLVMBasicBlockRef) {
 		LLVM.LLVMBuildCondBr(builder, condition.llvm, thenBlock, elseBlock)
 	}
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun ASTNode.codegen() = with(this) { codegenForThis() }
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Value.dereference() = with(this) { dereferenceForThis() }
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun ValueRef.setValue(value: Value) = with(this) { setValueForThis(value) }
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Value.implicitCast(to: Type) = with(CastManager) { implicitCast(this@implicitCast, to) }
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun TypeDescriptor.translate() = with(this) { translateForThis() }
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
 
-	@Suppress("NOTHING_TO_INLINE")
 	internal inline fun Type.sizeOf(): Value = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
@@ -179,6 +169,10 @@ class Context(
 		val ret = LLVM.LLVMVerifyModule(module, LLVM.LLVMReturnStatusAction, error)
 		return if (ret == 1) error.toJava()
 		else null
+	}
+
+	override fun dispose() {
+		LLVM.LLVMDisposeModule(module)
 	}
 }
 

@@ -8,7 +8,7 @@ import org.bytedeco.llvm.global.LLVM
 
 private fun Context.convert(value: Value, expected: TypeDescriptor? = null): Value {
 	expected?.translate()?.let { return value.implicitCast(it) }
-	return value
+	return value.dereference()
 }
 
 @Suppress("NOTHING_TO_INLINE")
@@ -31,7 +31,7 @@ internal class ValDeclareNode(
 			declare(name, value)
 			LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
 		}
-		return Value.Nothing
+		return Value.Unit
 	}
 
 	override fun toString(): String = "val $name${(type == null).ifThat { ": $type" }} = $defaultValue"
@@ -49,7 +49,7 @@ internal class VarDeclareNode(
 			declareVariable(name, type.translate().undefined(), isConst)
 		} else
 			declareVariable(name, convert(defaultValue.codegen(), type), isConst)
-		return Value.Nothing
+		return Value.Unit
 	}
 
 	override fun toString(): String =

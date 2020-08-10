@@ -32,6 +32,7 @@ internal sealed class Token {
 	object Struct : Token()
 	object Null : Token()
 	object SizeOf : Token()
+	object New : Token()
 
 	class Identifier(val name: String) : Token() {
 		override fun toString(): String = "Identifier($name)"
@@ -56,6 +57,7 @@ internal sealed class UnaryOp(symbol: String, precedence: Int) : Operator(symbol
 	object Decrement : UnaryOp("--", 12)
 	object Indirection : UnaryOp("*", 12)
 	object AddressOf : UnaryOp("&", 12)
+	object Delete : UnaryOp("delete ", 12)
 }
 
 internal open class BinOp(symbol: String, precedence: Int, val returnBoolean: Boolean = false) :
@@ -102,7 +104,7 @@ private enum class State : LexerState {
 
 private enum class Action : LexerAction {
 	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL,
-	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL,
+	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL, NEW, DELETE,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN
 }
 
@@ -134,6 +136,8 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"as" action Action.AS
 				"if" action Action.IF
 				"else" action Action.ELSE
+				"new" action Action.NEW
+				"delete" action Action.DELETE
 				"true|false" action Action.BOOLEAN_LITERAL
 				"[\\w\$_][\\w\\d\$_]*" action Action.IDENTIFIER
 				"\\d+UL" action Action.UNSIGNED_LONG_LITERAL
@@ -172,6 +176,8 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.AS -> returnValue(BinOp.As)
 			Action.NULL -> returnValue(Token.Null)
 			Action.SIZEOF -> returnValue(Token.SizeOf)
+			Action.NEW -> returnValue(Token.New)
+			Action.DELETE -> returnValue(UnaryOp.Delete)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
 			Action.CHAR_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integral.Char))
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))

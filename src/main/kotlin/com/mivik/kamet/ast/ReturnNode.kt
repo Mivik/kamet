@@ -12,7 +12,7 @@ internal class ReturnNode(val value: ASTNode) : ASTNode {
 		val result = value.codegen().implicitCast(returnType)
 		if (result.type.canImplicitlyCastTo(Type.Unit)) LLVM.LLVMBuildRetVoid(builder)
 		else LLVM.LLVMBuildRet(builder, result.llvm)
-		return Value.Nothing
+		return Value.Unit
 	}
 
 	override fun toString(): String = "return $value"

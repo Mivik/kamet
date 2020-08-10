@@ -81,7 +81,7 @@ internal class KametTest {
 
 	@Test
 	fun fibonacci() {
-		val engine = """
+		"""
 			#[no_mangle] fun fib(x: Int): Int {
 				if (x<=2) return 1
 				var a = 1
@@ -96,21 +96,21 @@ internal class KametTest {
 				}
 				return c
 			}
-		""".trimIndent().compile()
-		val func = engine.findFunction("fib")
-		assertEquals(
-			1,
-			engine.run(func, GenericValue(1)).int
-		)
-		assertEquals(
-			1,
-			engine.run(func, GenericValue(2)).int
-		)
-		assertEquals(
-			55,
-			engine.run(func, GenericValue(10)).int
-		)
-		engine.dispose()
+		""".trimIndent().compile().use {
+			val func = findFunction("fib")
+			assertEquals(
+				1,
+				run(func, GenericValue(1)).int
+			)
+			assertEquals(
+				1,
+				run(func, GenericValue(2)).int
+			)
+			assertEquals(
+				55,
+				run(func, GenericValue(10)).int
+			)
+		}
 	}
 
 	@Test
@@ -146,9 +146,7 @@ internal class KametTest {
 					doublePointer[1] = 233.5
 					return test.a[0]+test.b[1]
 				}
-			""".trimIndent().compile().run {
-				run("test").double.also { dispose() }
-			}.toInt()
+			""".trimIndent().runFunction("test").double.toInt()
 		)
 	}
 
@@ -163,5 +161,56 @@ internal class KametTest {
 				val a: A
 			}
 		""".trimIndent().tryCompile()
+	}
+
+	@Test
+	fun new() {
+		assertEquals(
+			2,
+			"""
+				val a: *Int = new Int
+				*a = 2
+				val ret = *a
+				ret
+			""".trimIndent().evaluate(Type.Primitive.Integral.Int).int
+		)
+
+		assertEquals(
+			2,
+			"""
+				fun get(): *Int {
+					val a: *Int = new Int
+					*a = 2
+					return a
+				}
+				
+				#[no_mangle] fun test(): Int {
+					val ptr = get()
+					val ret = *ptr
+					delete ptr
+					return ret
+				}
+			""".trimIndent().runFunction("test").int
+		)
+	}
+
+	@Test
+	fun `passing array`() {
+		assertEquals(
+			1,
+			"""
+				fun modify(a: &[Int, 5]) {
+					a[0] = 1
+				}
+				
+				#[no_mangle] fun test(): Int {
+					var a: [Int, 5]
+					modify(a)
+					return a[0]
+				}
+			""".trimIndent().compile().use {
+				run("test").int
+			}
+		)
 	}
 }

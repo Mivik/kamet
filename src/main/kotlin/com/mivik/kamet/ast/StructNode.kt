@@ -25,7 +25,7 @@ internal class StructNode(
 
 	override fun Context.codegenForThis(): Value {
 		declareType(Type.Struct(name, elements.map { Pair(it.first, it.second.translate()) }, isPacked))
-		return Value.Nothing
+		return Value.Unit
 	}
 
 	override fun toString(): String =

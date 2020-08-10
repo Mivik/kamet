@@ -14,7 +14,7 @@ internal class WhileNode(val condition: ASTNode, val block: ASTNode) : ASTNode {
 			condBr(condition.codegen(), whileBB, finalBB)
 		}
 		insertAt(finalBB)
-		return Value.Nothing
+		return Value.Unit
 	}
 
 	override fun toString(): String = "while ($condition) $block"

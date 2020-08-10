@@ -12,7 +12,7 @@ internal class DoWhileNode(val block: ASTNode, val condition: ASTNode) : ASTNode
 			block.codegen()
 			condBr(condition.codegen(), whileBB, finalBB)
 		}
-		return Value.Nothing
+		return Value.Unit
 	}
 
 	override fun toString(): String = "do $block while ($condition)"

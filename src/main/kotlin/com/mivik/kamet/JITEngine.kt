@@ -15,7 +15,7 @@ import org.bytedeco.llvm.global.LLVM.LLVMInitializeNativeTarget
 import org.bytedeco.llvm.global.LLVM.LLVMLinkInMCJIT
 import org.bytedeco.llvm.global.LLVM.LLVMRunFunction
 
-class JITEngine(module: LLVMModuleRef) {
+class JITEngine(module: LLVMModuleRef) : Disposable {
 	companion object {
 		init {
 			LLVMLinkInMCJIT()
@@ -54,7 +54,7 @@ class JITEngine(module: LLVMModuleRef) {
 	@Suppress("NOTHING_TO_INLINE")
 	inline fun runMain() = run("main")
 
-	fun dispose() {
+	override fun dispose() {
 		LLVMDisposeExecutionEngine(engine)
 	}
 }

@@ -9,6 +9,7 @@ import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.InvocationNode
+import com.mivik.kamet.ast.NewNode
 import com.mivik.kamet.ast.PointerSubscriptNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
@@ -78,10 +79,9 @@ internal class Parser(private val lexer: Lexer) {
 				BinOp.Minus -> UnaryOp.Negative
 				BinOp.Multiply -> UnaryOp.Indirection
 				BinOp.BitwiseAnd -> UnaryOp.AddressOf
-				else -> expect()
+				else -> op.expect()
 			}, rhs
-		)
-		else BinOpNode(lhs, rhs, op.expect())
+		) else BinOpNode(lhs, rhs, op.expect())
 
 	// TODO Use stack to implement this.
 	private fun takeBinOp(precedence: Int, lhs: ASTNode?): ASTNode {
@@ -156,6 +156,7 @@ internal class Parser(private val lexer: Lexer) {
 				takeBinOp(-1, null)
 			}
 			Token.SizeOf -> SizeOfNode(takeType())
+			Token.New -> NewNode(takeType())
 			else -> unexpected(token)
 		}
 

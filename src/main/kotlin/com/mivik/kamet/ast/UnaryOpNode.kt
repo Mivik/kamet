@@ -14,10 +14,17 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 	override fun Context.codegenForThis(): Value {
 		var value = value.codegen()
 		when (op) {
+			UnaryOp.Delete -> {
+				value = value.dereference()
+				val type = value.type
+				require(type is Type.Pointer) { "Deleting a non-pointer type: $type" }
+				LLVM.LLVMBuildFree(builder, value.llvm)
+				return Value.Unit
+			}
 			UnaryOp.Indirection -> {
 				value = value.dereference()
 				val type = value.type
-				require(type is Type.Pointer) { "Indirection of a non-pointer type: ${value.type}" }
+				require(type is Type.Pointer) { "Indirection of a non-pointer type: $type" }
 				return ValueRef(value.llvm, type.elementType, type.isConst)
 			}
 			UnaryOp.AddressOf -> {

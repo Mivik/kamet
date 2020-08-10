@@ -53,6 +53,6 @@ internal inline fun <reified T> Any?.expect(): T {
 	contract {
 		returns() implies (this@expect is T)
 	}
-	require(this is T) { "Expected ${T::class.java.simpleName}, got $this" }
+	require(this is T) { "Expected ${T::class.simpleName}, got $this" }
 	return this
 }
