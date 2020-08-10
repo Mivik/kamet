@@ -1,6 +1,7 @@
 package com.mivik.kamet
 
 import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.Pointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.global.LLVM
 import kotlin.contracts.ExperimentalContracts
@@ -56,3 +57,5 @@ internal inline fun <reified T> Any?.expect(): T {
 	require(this is T) { "Expected ${T::class.simpleName}, got $this" }
 	return this
 }
+
+internal val nullPointer = Pointer(null as Pointer?)

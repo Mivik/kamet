@@ -16,7 +16,7 @@ internal class FunctionNode(
 		insertAt(sub.basicBlock("entry"))
 		for ((i, parameter) in prototype.parameters.withIndex()) {
 			val (name, type) = parameter
-			sub.declare(name, type.translate().new(LLVM.LLVMGetParam(function.llvm, i)))
+			sub.declare(name, type.resolve().new(LLVM.LLVMGetParam(function.llvm, i)))
 		}
 		with(sub) { body.codegen() }
 		declare(prototype.name, function)

@@ -91,20 +91,13 @@ class Context(
 	}
 
 	internal inline fun ASTNode.codegen() = with(this) { codegenForThis() }
-
 	internal inline fun Value.dereference() = with(this) { dereferenceForThis() }
-
 	internal inline fun ValueRef.setValue(value: Value) = with(this) { setValueForThis(value) }
-
 	internal inline fun Value.implicitCast(to: Type) = with(CastManager) { implicitCast(this@implicitCast, to) }
-
 	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
-
-	internal inline fun TypeDescriptor.translate() = with(this) { translateForThis() }
-
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
-
-	internal inline fun Type.sizeOf(): Value = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
+	internal inline fun Type.sizeOf() = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
+	internal inline fun Type.resolve() = resolveForThis()
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))

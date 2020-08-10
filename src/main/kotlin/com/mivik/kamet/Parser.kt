@@ -178,7 +178,7 @@ internal class Parser(private val lexer: Lexer) {
 			Token.Val -> {
 				take()
 				val name = take().expect<Token.Identifier>().name
-				var type: TypeDescriptor? = null
+				var type: Type? = null
 				if (peek() == Token.Colon) {
 					take()
 					type = takeType()
@@ -197,7 +197,7 @@ internal class Parser(private val lexer: Lexer) {
 					} else false
 				take()
 				val name = take().expect<Token.Identifier>().name
-				var type: TypeDescriptor? = null
+				var type: Type? = null
 				if (peek() == Token.Colon) {
 					take()
 					type = takeType()
@@ -255,17 +255,17 @@ internal class Parser(private val lexer: Lexer) {
 		return block
 	}
 
-	fun takeType(): TypeDescriptor =
+	fun takeType(): Type =
 		when (val token = trimAndTake()) {
 			BinOp.BitwiseAnd -> { // &(const )type
 				val isConst = peek() == Token.Const
 				if (isConst) take()
-				TypeDescriptor.Reference(takeType(), isConst)
+				Type.Reference(takeType(), isConst)
 			}
 			BinOp.Multiply -> { // *(const )type
 				val isConst = peek() == Token.Const
 				if (isConst) take()
-				TypeDescriptor.Pointer(takeType(), isConst)
+				Type.Pointer(takeType(), isConst)
 			}
 			Token.LeftParenthesis -> takeType().also { trimAndTake().expect<Token.RightParenthesis>() }
 			Token.LeftBracket -> { // [(const )type, size]
@@ -277,13 +277,13 @@ internal class Parser(private val lexer: Lexer) {
 				val size = takeExpr().expect<ConstantNode>()
 				size.type.expect<Type.Primitive.Integral>()
 				take().expect<Token.RightBracket>()
-				TypeDescriptor.Array(elementType, size.value.toLongIgnoringOverflow().toInt(), isConst)
+				Type.Array(elementType, size.value.toLongIgnoringOverflow().toInt(), isConst)
 			}
 			is Token.Identifier -> {
-				val type = TypeDescriptor.Named(token.name)
+				val type = Type.Named(token.name)
 				if (peek() == Token.LeftParenthesis) {
 					take()
-					val parameterTypes = mutableListOf<TypeDescriptor>()
+					val parameterTypes = mutableListOf<Type>()
 					if (peek() != Token.RightParenthesis)
 						while (true) {
 							parameterTypes += takeType()
@@ -291,7 +291,7 @@ internal class Parser(private val lexer: Lexer) {
 							if (splitter == Token.RightParenthesis) break
 							else splitter.expect<Token.Comma>()
 						}
-					TypeDescriptor.Function(type, parameterTypes)
+					Type.Function(type, parameterTypes)
 				} else type
 			}
 			else -> impossible()
@@ -300,7 +300,7 @@ internal class Parser(private val lexer: Lexer) {
 	fun takePrototype(): PrototypeNode {
 		trimAndTake().expect<Token.Function>()
 		val name = trimAndTake().expect<Token.Identifier>().name
-		val args = mutableListOf<Pair<String, TypeDescriptor>>()
+		val args = mutableListOf<Pair<String, Type>>()
 		take().expect<Token.LeftParenthesis>()
 		if (trimAndPeek() != Token.RightParenthesis)
 			while (true) {
@@ -315,7 +315,7 @@ internal class Parser(private val lexer: Lexer) {
 		return if (trimAndPeek() == Token.Colon) {
 			take()
 			PrototypeNode(consumeAttrs(), name, takeType(), args)
-		} else PrototypeNode(consumeAttrs(), name, Type.Unit.asDescriptor(), args)
+		} else PrototypeNode(consumeAttrs(), name, Type.Unit, args)
 	}
 
 	@Suppress("NOTHING_TO_INLINE")
@@ -345,7 +345,7 @@ internal class Parser(private val lexer: Lexer) {
 	fun takeStruct(): StructNode {
 		take().expect<Token.Struct>()
 		val name = trimAndTake().expect<Token.Identifier>().name
-		val elements = mutableListOf<Pair<String, TypeDescriptor>>()
+		val elements = mutableListOf<Pair<String, Type>>()
 		trimAndTake().expect<Token.LeftBrace>()
 		if (trimAndPeek() != Token.RightBrace)
 			while (true) {

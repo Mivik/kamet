@@ -18,7 +18,7 @@ internal class KametTest {
 			val parser = Parser("{$this}")
 			val block = parser.takeBlock()
 			FunctionNode(
-				PrototypeNode(setOf(Attribute.NO_MANGLE), functionName, returnType.asDescriptor(), emptyList()),
+				PrototypeNode(setOf(Attribute.NO_MANGLE), functionName, returnType, emptyList()),
 				BlockNode().also {
 					it.elements += ReturnNode(block)
 				}

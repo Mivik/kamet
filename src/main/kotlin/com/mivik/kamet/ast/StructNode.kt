@@ -4,14 +4,13 @@ import com.mivik.kamet.Attribute
 import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
-import com.mivik.kamet.TypeDescriptor
 import com.mivik.kamet.Value
 import com.mivik.kamet.ifThat
 
 internal class StructNode(
 	attributes: Attributes,
 	val name: String,
-	val elements: List<Pair<String, TypeDescriptor>>
+	val elements: List<Pair<String, Type>>
 ) : ASTNode {
 	val isPacked: Boolean
 
@@ -24,7 +23,7 @@ internal class StructNode(
 	}
 
 	override fun Context.codegenForThis(): Value {
-		declareType(Type.Struct(name, elements.map { Pair(it.first, it.second.translate()) }, isPacked))
+		declareType(Type.Struct(name, elements.map { Pair(it.first, it.second.resolve()) }, isPacked))
 		return Value.Unit
 	}
 

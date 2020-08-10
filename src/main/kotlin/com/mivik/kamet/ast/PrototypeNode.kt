@@ -4,7 +4,6 @@ import com.mivik.kamet.Attribute
 import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
-import com.mivik.kamet.TypeDescriptor
 import com.mivik.kamet.Value
 import com.mivik.kamet.ifThat
 import org.bytedeco.llvm.global.LLVM
@@ -12,8 +11,8 @@ import org.bytedeco.llvm.global.LLVM
 internal class PrototypeNode(
 	attributes: Attributes,
 	val name: String,
-	val returnType: TypeDescriptor,
-	val parameters: List<Pair<String, TypeDescriptor>>
+	val returnType: Type,
+	val parameters: List<Pair<String, Type>>
 ) : ASTNode {
 	val noMangle: Boolean
 
@@ -40,10 +39,10 @@ internal class PrototypeNode(
 
 	override fun Context.codegenForThis(): Value {
 		lookupValueOrNull(functionName)?.let { return it }
-		val returnType = returnType.translate()
+		val returnType = returnType.resolve()
 		val functionType = Type.Function(
 			returnType,
-			parameters.map { it.second.translate() }
+			parameters.map { it.second.resolve() }
 		)
 		val function = LLVM.LLVMAddFunction(module, functionName, functionType.llvm)
 		for (i in parameters.indices) {

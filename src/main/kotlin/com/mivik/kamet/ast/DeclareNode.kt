@@ -1,13 +1,13 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
-import com.mivik.kamet.TypeDescriptor
+import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.ifThat
 import org.bytedeco.llvm.global.LLVM
 
-private fun Context.convert(value: Value, expected: TypeDescriptor? = null): Value {
-	expected?.translate()?.let { return value.implicitCast(it) }
+private fun Context.convert(value: Value, expected: Type? = null): Value {
+	expected?.resolve()?.let { return value.implicitCast(it) }
 	return value.dereference()
 }
 
@@ -17,13 +17,13 @@ private inline fun unclearVariable(name: String): Nothing =
 
 internal class ValDeclareNode(
 	val name: String,
-	val type: TypeDescriptor? = null,
+	val type: Type? = null,
 	val defaultValue: ASTNode? = null
 ) : ASTNode {
 	override fun Context.codegenForThis(): Value {
 		if (defaultValue == null) {
 			type ?: unclearVariable(name)
-			val value = type.translate().undefined()
+			val value = type.resolve().undefined()
 			declare(name, value)
 			LLVM.LLVMSetValueName2(value.llvm, name, name.length.toLong())
 		} else {
@@ -39,14 +39,14 @@ internal class ValDeclareNode(
 
 internal class VarDeclareNode(
 	val name: String,
-	val type: TypeDescriptor? = null,
+	val type: Type? = null,
 	val defaultValue: ASTNode? = null,
 	val isConst: Boolean = false
 ) : ASTNode {
 	override fun Context.codegenForThis(): Value {
 		if (defaultValue == null) {
 			type ?: unclearVariable(name)
-			declareVariable(name, type.translate().undefined(), isConst)
+			declareVariable(name, type.resolve().undefined(), isConst)
 		} else
 			declareVariable(name, convert(defaultValue.codegen(), type), isConst)
 		return Value.Unit
