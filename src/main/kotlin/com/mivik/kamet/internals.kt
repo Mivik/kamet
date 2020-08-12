@@ -2,6 +2,7 @@ package com.mivik.kamet
 
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
+import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.global.LLVM
 import kotlin.contracts.ExperimentalContracts
@@ -59,3 +60,23 @@ internal inline fun <reified T> Any?.expect(): T {
 }
 
 internal val nullPointer = Pointer(null as Pointer?)
+
+internal fun findMatchingFunction(name: String, alternatives: List<Function>, argumentTypes: List<Type>): Function {
+	val functions = alternatives.takeUnless { it.isEmpty() } ?: error("No function named \"$name\"")
+	var found: Function? = null
+	val argStr by lazy { argumentTypes.joinToString { it.name } }
+	for (function in functions) {
+		val type = function.type
+		val parameterTypes = type.parameterTypes
+		if (argumentTypes.size != parameterTypes.size) continue
+		if (argumentTypes.indices.any { !argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }) continue
+		if (found == null) found = function
+		else error("Ambiguous call to function \"$name\": ${function.type} and ${found.type} are both applicable to arguments ($argStr)")
+	}
+	return found ?: error("No matching function for call to \"$name\" with argument types: ($argStr)")
+}
+
+internal inline fun <T : Pointer> buildPointerPointer(size: Int, generator: (Int) -> T): PointerPointer<T> =
+	PointerPointer<T>(size.toLong()).apply {
+		for (i in 0 until size) put(i.toLong(), generator(i))
+	}

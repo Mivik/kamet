@@ -3,6 +3,7 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Attribute
 import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
+import com.mivik.kamet.Function
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import com.mivik.kamet.ifThat
@@ -35,6 +36,10 @@ internal class PrototypeNode(
 			this.functionName = functionName
 			noMangle = true
 		}
+		val has = mutableSetOf<String>()
+		for (para in parameters)
+			if (has.contains(para.first)) error("Duplicate parameter name: ${para.first}")
+			else has += para.first
 	}
 
 	override fun Context.codegenForThis(): Value {
@@ -49,7 +54,7 @@ internal class PrototypeNode(
 			val paramName = parameters[i].first
 			LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, i), paramName, paramName.length.toLong())
 		}
-		return functionType.new(function).also { declareFunction(this@PrototypeNode, it) }
+		return functionType.new(function).also { declareFunction(this@PrototypeNode, Function.Static(it)) }
 	}
 
 	override fun toString(): String =

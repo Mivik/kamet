@@ -22,7 +22,7 @@ class Context(
 	val currentFunction: Value?,
 	private val valueMap: MutableMap<String, Value>,
 	private val typeMap: MutableMap<String, Type>,
-	private val functionMap: MutableMap<String, MutableList<Value>>
+	private val functionMap: MutableMap<String, MutableList<Function>>
 ) : Disposable {
 	companion object {
 		fun topLevel(moduleName: String): Context =
@@ -98,6 +98,7 @@ class Context(
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
 	internal inline fun Type.sizeOf() = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
 	internal inline fun Type.resolve() = resolveForThis()
+	internal inline fun Function.invoke(receiver: Value?, arguments: List<Value>) = invokeForThis(receiver, arguments)
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
@@ -118,20 +119,19 @@ class Context(
 		return ret
 	}
 
-	internal fun declareFunction(prototype: PrototypeNode, value: Value) {
-		val parameterTypes = (value.type as Type.Function).parameterTypes
+	internal fun declareFunction(prototype: PrototypeNode, value: Function) {
+		val parameterTypes = value.type.parameterTypes
 		findDuplicate@ for (function in lookupFunctions(prototype.name)) {
-			val type = function.type as Type.Function
+			val type = function.type
 			if (parameterTypes.size != type.parameterTypes.size) continue
 			for (i in parameterTypes.indices)
 				if (parameterTypes[i] != type.parameterTypes[i]) continue@findDuplicate
 			error("Function ${prototype.name} redeclared with same parameter types: (${parameterTypes.joinToString()})")
 		}
-		declare(prototype.functionName, value)
 		functionMap.getOrPut(prototype.name) { mutableListOf() } += value
 	}
 
-	internal fun lookupFunctions(name: String): List<Value> {
+	internal fun lookupFunctions(name: String): List<Function> {
 		var current = this
 		while (true) {
 			current.functionMap[name]?.let { return it }

@@ -8,7 +8,7 @@ import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.IfNode
-import com.mivik.kamet.ast.InvocationNode
+import com.mivik.kamet.ast.CallNode
 import com.mivik.kamet.ast.NewNode
 import com.mivik.kamet.ast.PointerSubscriptNode
 import com.mivik.kamet.ast.PrototypeNode
@@ -133,10 +133,10 @@ internal class Parser(private val lexer: Lexer) {
 							if (splitter == Token.RightParenthesis) break
 							else splitter.expect<Token.Comma>()
 						}
-						InvocationNode(token.name, list)
+						CallNode(token.name, null, list)
 					} else {
 						take()
-						InvocationNode(token.name, emptyList())
+						CallNode(token.name, null, emptyList())
 					}
 				} else ValueNode(token.name)
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
