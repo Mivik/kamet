@@ -6,29 +6,41 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Function
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
+import com.mivik.kamet.buildAttributes
+import com.mivik.kamet.ifNotNull
 import com.mivik.kamet.ifThat
+import com.mivik.kamet.impossible
+import com.mivik.kamet.toInt
 import org.bytedeco.llvm.global.LLVM
 
 internal class PrototypeNode(
 	attributes: Attributes,
 	val name: String,
-	val returnType: Type,
-	val parameters: List<Pair<String, Type>>
+	val type: Type.Function,
+	val parameterNames: List<String>
 ) : ASTNode {
 	val noMangle: Boolean
+	val extern: Boolean
 
 	inline val mangledName: String
-		get() = "$name(${parameters.joinToString(",") { "${it.second}" }}):$returnType"
+		get() = "${(type.receiverType != null).ifThat { "${type.receiverType}." }}$name(${
+			type.parameterTypes.joinToString(
+				","
+			)
+		}):${type.returnType}"
 
 	val functionName: String
 
 	init {
 		var functionName: String? = null
-		for (attr in attributes)
+		var extern = false
+		for (attr in attributes.verify("Prototype", setOf(Attribute.NO_MANGLE, Attribute.EXTERN)))
 			when (attr) {
 				Attribute.NO_MANGLE -> functionName = name
-				else -> attr.notApplicableTo("Prototype")
+				Attribute.EXTERN -> extern = true
+				else -> impossible()
 			}
+		this.extern = extern
 		if (functionName == null) {
 			this.functionName = mangledName
 			noMangle = false
@@ -36,27 +48,25 @@ internal class PrototypeNode(
 			this.functionName = functionName
 			noMangle = true
 		}
-		val has = mutableSetOf<String>()
-		for (para in parameters)
-			if (has.contains(para.first)) error("Duplicate parameter name: ${para.first}")
-			else has += para.first
 	}
 
 	override fun Context.codegenForThis(): Value {
+		val type = type.resolve() as Type.Function
 		lookupValueOrNull(functionName)?.let { return it }
-		val returnType = returnType.resolve()
-		val functionType = Type.Function(
-			returnType,
-			parameters.map { it.second.resolve() }
-		)
-		val function = LLVM.LLVMAddFunction(module, functionName, functionType.llvm)
-		for (i in parameters.indices) {
-			val paramName = parameters[i].first
-			LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, i), paramName, paramName.length.toLong())
+		val function = LLVM.LLVMAddFunction(module, functionName, type.llvm)
+		val offset = type.hasReceiver.toInt()
+		if (type.hasReceiver) LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, 0), "this", "this".length.toLong())
+		parameterNames.forEachIndexed { index, name ->
+			LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, index + offset), name, name.length.toLong())
 		}
-		return functionType.new(function).also { declareFunction(this@PrototypeNode, Function.Static(it)) }
+		return type.new(function).also { declareFunction(this@PrototypeNode, Function.Static(it)) }
 	}
 
 	override fun toString(): String =
-		"${noMangle.ifThat { "#[no_mangle] " }}fun $name(${parameters.joinToString { "${it.first}: ${it.second}" }}): $returnType"
+		"${
+			buildAttributes {
+				if (noMangle) +Attribute.NO_MANGLE
+				if (extern) +Attribute.EXTERN
+			}
+		}fun ${type.receiverType.ifNotNull { "${type.receiverType}." }}$name(${parameterNames.indices.joinToString { "${parameterNames[it]}: ${type.parameterTypes[it]}" }}): ${type.returnType}"
 }

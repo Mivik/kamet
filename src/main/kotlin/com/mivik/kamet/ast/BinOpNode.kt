@@ -130,15 +130,23 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 				lv
 			}
 			BinOp.AccessMember -> {
-				require(rhs is ValueNode) { "Expected a member name, got $rhs" }
-				val type = lv.type.expect<Type.Reference>()
-				val originStruct = type.originalType.expect<Type.Struct>()
-				val index = originStruct.memberIndex(rhs.name)
-				ValueRef(
-					LLVMBuildStructGEP2(builder, originStruct.llvm, lv.llvm, index, "access_member"),
-					originStruct.memberType(index),
-					type.isConst
-				)
+				when (rhs) {
+					is ValueNode -> {
+						val type = lv.type.expect<Type.Reference>()
+						val originStruct = type.originalType.expect<Type.Struct>()
+						val index = originStruct.memberIndex(rhs.name)
+						ValueRef(
+							LLVMBuildStructGEP2(builder, originStruct.llvm, lv.llvm, index, "access_member"),
+							originStruct.memberType(index),
+							type.isConst
+						)
+					}
+					is CallNode -> {
+						// lhs is actually the receiver
+						CallNode(lv.direct(), rhs.name, rhs.elements).codegen()
+					}
+					else -> error("Unexpected $rhs")
+				}
 			}
 			else -> arithmeticCodegen(lv, rv, op)
 		}

@@ -20,9 +20,10 @@ class Context(
 	val module: LLVMModuleRef,
 	val builder: LLVMBuilderRef,
 	val currentFunction: Value?,
-	private val valueMap: MutableMap<String, Value>,
-	private val typeMap: MutableMap<String, Type>,
-	private val functionMap: MutableMap<String, MutableList<Function>>
+	private val valueMap: PersistentMap<String, Value>,
+	private val typeMap: PersistentMap<String, Type>,
+	private val functionMap: PersistentMap<String, MutableList<Function>>,
+	private val genericMap: PersistentMap<String, GenericType>
 ) : Disposable {
 	companion object {
 		fun topLevel(moduleName: String): Context =
@@ -31,48 +32,52 @@ class Context(
 				LLVM.LLVMModuleCreateWithName(moduleName),
 				LLVM.LLVMCreateBuilder(),
 				null,
-				mutableMapOf(),
-				Type.defaultTypeMap(),
-				mutableMapOf()
+				PersistentMap(),
+				Type.defaultTypeMap.subMap(),
+				PersistentMap(),
+				PersistentMap()
 			)
 	}
 
 	val llvmFunction: LLVMValueRef
 		get() = currentFunction!!.llvm
 
-	fun lookupValueOrNull(name: String): Value? {
-		var current = this
-		while (true) {
-			current.valueMap[name]?.let { return it }
-			current = current.parent ?: return null
-		}
-	}
-
-	fun lookupValue(name: String): Value = lookupValueOrNull(name) ?: error("Unknown identifier ${name.escape()}")
-
+	fun lookupValueOrNull(name: String) = valueMap[name]
+	fun lookupValue(name: String) = valueMap[name] ?: error("Unknown identifier ${name.escape()}")
+	fun lookupTypeOrNull(name: String) = typeMap[name]
+	fun lookupType(name: String) = typeMap[name] ?: error("Unknown type ${name.escape()}")
+	fun lookupGenericOrNull(name: String) = genericMap[name]
 	fun hasValue(name: String): Boolean = valueMap.containsKey(name)
+	fun lookupFunctions(name: String, receiverType: Type? = null) = functionMap[name] ?: emptyList()
+	fun lookupGeneric(name: String) = genericMap[name] ?: error("Unknown generic type ${name.escape()}")
 
-	fun lookupTypeOrNull(name: String): Type? {
-		var current = this
-		while (true) {
-			current.typeMap[name]?.let { return it }
-			current = current.parent ?: return null
-		}
+	inline fun declareType(type: Type) = declareType(type.name, type)
+
+	fun declareType(name: String, type: Type) {
+		if (typeMap.containsKey(name)) error("Redeclaration of type ${name.escape()}")
+		typeMap[name] = type
 	}
 
-	fun lookupType(name: String): Type = lookupTypeOrNull(name) ?: error("Unknown type ${name.escape()}")
-
-	fun declareType(type: Type) {
-		if (typeMap.containsKey(type.name)) error("Redeclare of type ${type.name}")
-		typeMap[type.name] = type
+	fun declareGeneric(name: String, generic: GenericType) {
+		if (genericMap.containsKey(name)) error("Redeclaration of generic type ${name.escape()}")
+		genericMap[name] = generic
 	}
 
 	fun declare(name: String, value: Value) {
 		valueMap[name] = value
 	}
 
-	fun subContext(currentFunction: Value = this.currentFunction!!): Context =
-		Context(this, module, builder, currentFunction, mutableMapOf(), mutableMapOf(), mutableMapOf())
+	fun subContext(currentFunction: Value? = this.currentFunction): Context =
+		Context(
+			this,
+			module,
+			builder,
+			currentFunction,
+			valueMap.subMap(),
+			typeMap.subMap(),
+			functionMap.subMap(),
+			genericMap.subMap()
+		)
 
 	inline fun insertAt(block: LLVMBasicBlockRef) {
 		LLVM.LLVMPositionBuilderAtEnd(builder, block)
@@ -97,8 +102,9 @@ class Context(
 	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
 	internal inline fun Type.sizeOf() = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
-	internal inline fun Type.resolve() = resolveForThis()
+	internal inline fun Type.resolve(newName: String = name) = resolveForThis(newName)
 	internal inline fun Function.invoke(receiver: Value?, arguments: List<Value>) = invokeForThis(receiver, arguments)
+	internal inline fun GenericType.resolve(arguments: List<Type>) = buildForThis(arguments)
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
@@ -129,14 +135,6 @@ class Context(
 			error("Function ${prototype.name} redeclared with same parameter types: (${parameterTypes.joinToString()})")
 		}
 		functionMap.getOrPut(prototype.name) { mutableListOf() } += value
-	}
-
-	internal fun lookupFunctions(name: String): List<Function> {
-		var current = this
-		while (true) {
-			current.functionMap[name]?.let { return it }
-			current = current.parent ?: return emptyList()
-		}
 	}
 
 	fun runDefaultPass(): Context = apply {

@@ -47,6 +47,9 @@ internal fun BytePointer.toJava(): String =
 inline fun Boolean.ifThat(string: () -> String) =
 	if (this) string() else ""
 
+inline fun Any?.ifNotNull(string: () -> String) =
+	if (this != null) string() else ""
+
 @Suppress("NOTHING_TO_INLINE")
 inline fun Boolean.toInt() = if (this) 1 else 0
 
@@ -59,22 +62,47 @@ internal inline fun <reified T> Any?.expect(): T {
 	return this
 }
 
-internal val nullPointer = Pointer(null as Pointer?)
+internal fun <T> List<T>.readOnly() =
+	when (size) {
+		0 -> emptyList()
+		1 -> listOf(this[0])
+		else -> this
+	}
 
-internal fun findMatchingFunction(name: String, alternatives: List<Function>, argumentTypes: List<Type>): Function {
-	val functions = alternatives.takeUnless { it.isEmpty() } ?: error("No function named \"$name\"")
+internal fun <T> Set<T>.readOnly() =
+	when (size) {
+		0 -> emptySet()
+		1 -> setOf(first())
+		else -> this
+	}
+
+internal fun findMatchingFunction(
+	name: String,
+	alternatives: Iterable<Function>,
+	receiverType: Type?,
+	argumentTypes: List<Type>
+): Function {
+	val functions = alternatives.iterator().takeIf { it.hasNext() } ?: error("No function named ${name.escape()}")
 	var found: Function? = null
 	val argStr by lazy { argumentTypes.joinToString { it.name } }
 	for (function in functions) {
 		val type = function.type
 		val parameterTypes = type.parameterTypes
 		if (argumentTypes.size != parameterTypes.size) continue
+		if (receiverType == null) {
+			if (type.receiverType != null) continue
+		} else {
+			if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) continue
+		}
 		if (argumentTypes.indices.any { !argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }) continue
 		if (found == null) found = function
-		else error("Ambiguous call to function \"$name\": ${function.type} and ${found.type} are both applicable to arguments ($argStr)")
+		else error("Ambiguous call to function ${name.escape()}: ${function.type} and ${found.type} are both applicable to arguments ($argStr)")
 	}
-	return found ?: error("No matching function for call to \"$name\" with argument types: ($argStr)")
+	return found ?: error("No matching function for call to ${name.escape()} with argument types: ($argStr)")
 }
+
+internal fun <T : Pointer> List<T>.toPointerPointer() =
+	buildPointerPointer(size) { this[it] }
 
 internal inline fun <T : Pointer> buildPointerPointer(size: Int, generator: (Int) -> T): PointerPointer<T> =
 	PointerPointer<T>(size.toLong()).apply {

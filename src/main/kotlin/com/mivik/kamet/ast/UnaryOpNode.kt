@@ -10,7 +10,7 @@ import com.mivik.kamet.impossible
 import com.mivik.kamet.pointer
 import org.bytedeco.llvm.global.LLVM
 
-internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boolean = false) : ASTNode {
+internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val postfix: Boolean = false) : ASTNode {
 	override fun Context.codegenForThis(): Value {
 		var value = value.codegen()
 		when (op) {
@@ -35,7 +35,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 			UnaryOp.Increment -> {
 				require(value is ValueRef && !value.isConst) { "Increment on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
-				val ret = if (after) value.dereference() else value
+				val ret = if (postfix) value.dereference() else value
 				value.setValue(
 					originalType.new(
 						when (originalType) {
@@ -62,7 +62,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val after: Boole
 			UnaryOp.Decrement -> {
 				require(value is ValueRef && !value.isConst) { "Decrement on a non-variable type: ${value.type}" }
 				val originalType = value.originalType
-				val ret = if (after) value.dereference() else value
+				val ret = if (postfix) value.dereference() else value
 				value.setValue(
 					originalType.new(
 						when (originalType) {

@@ -3,6 +3,8 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
+import com.mivik.kamet.escape
+import com.mivik.kamet.ifNotNull
 import com.mivik.kamet.ifThat
 import org.bytedeco.llvm.global.LLVM
 
@@ -13,7 +15,7 @@ private fun Context.convert(value: Value, expected: Type? = null): Value {
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun unclearVariable(name: String): Nothing =
-	error("Declaration of variable \"$name\" without type or initializer.")
+	error("Declaration of variable ${name.escape()} without type or initializer.")
 
 internal class ValDeclareNode(
 	val name: String,
@@ -34,7 +36,7 @@ internal class ValDeclareNode(
 		return Value.Unit
 	}
 
-	override fun toString(): String = "val $name${(type == null).ifThat { ": $type" }} = $defaultValue"
+	override fun toString(): String = "val $name${type.ifNotNull { ": $type" }} = $defaultValue"
 }
 
 internal class VarDeclareNode(
@@ -53,5 +55,5 @@ internal class VarDeclareNode(
 	}
 
 	override fun toString(): String =
-		"${isConst.ifThat { "const " }}var $name${if (type == null) "" else ": $type"} = $defaultValue"
+		"${isConst.ifThat { "const " }}var $name${type.ifNotNull { ": $type" }} = $defaultValue"
 }

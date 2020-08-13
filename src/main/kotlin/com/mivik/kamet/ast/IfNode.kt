@@ -3,7 +3,7 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 import com.mivik.kamet.doInside
-import com.mivik.kamet.ifThat
+import com.mivik.kamet.ifNotNull
 
 internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBlock: ASTNode? = null) : ASTNode {
 	override fun Context.codegenForThis(): Value {
@@ -55,7 +55,7 @@ internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBl
 	}
 
 	override fun toString(): String =
-		"if ($condition) $thenBlock${(elseBlock != null).ifThat { " else $elseBlock" }}"
+		"if ($condition) $thenBlock${elseBlock.ifNotNull { " else $elseBlock" }}"
 
 	override val returned: Boolean
 		get() = thenBlock.returned && elseBlock != null && elseBlock.returned

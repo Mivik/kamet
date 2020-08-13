@@ -1,20 +1,18 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
-import com.mivik.kamet.Type
 import com.mivik.kamet.Value
-import com.mivik.kamet.canImplicitlyCastTo
 import com.mivik.kamet.findMatchingFunction
-import com.mivik.kamet.ifThat
-import org.bytedeco.javacpp.PointerPointer
-import org.bytedeco.llvm.global.LLVM
+import com.mivik.kamet.ifNotNull
 
-internal class CallNode(val name: String, val receiver: ASTNode?, val elements: List<ASTNode>) : ASTNode {
+internal class CallNode(val receiver: ASTNode?, val name: String, val elements: List<ASTNode>) : ASTNode {
 	override fun Context.codegenForThis(): Value {
+		val receiver = receiver?.codegen()
 		val arguments = elements.map { it.codegen() }
-		val function = findMatchingFunction(name, lookupFunctions(name), arguments.map { it.type })
-		return function.invoke(receiver?.codegen(), arguments)
+		val function =
+			findMatchingFunction(name, lookupFunctions(name, receiver?.type), receiver?.type, arguments.map { it.type })
+		return function.invoke(receiver, arguments)
 	}
 
-	override fun toString(): String = "$name(${elements.joinToString()})"
+	override fun toString(): String = "${receiver.ifNotNull { "$receiver." }}$name(${elements.joinToString()})"
 }

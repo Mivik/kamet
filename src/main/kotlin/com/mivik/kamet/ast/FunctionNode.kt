@@ -1,7 +1,9 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
+import com.mivik.kamet.Type
 import com.mivik.kamet.Value
+import com.mivik.kamet.toInt
 import org.bytedeco.llvm.global.LLVM
 
 internal class FunctionNode(
@@ -14,10 +16,13 @@ internal class FunctionNode(
 		LLVM.LLVMGetNamedFunction(module, prototype.name)
 		val sub = subContext(function)
 		insertAt(sub.basicBlock("entry"))
-		for ((i, parameter) in prototype.parameters.withIndex()) {
-			val (name, type) = parameter
-			sub.declare(name, type.resolve().new(LLVM.LLVMGetParam(function.llvm, i)))
-		}
+		val type = function.type as Type.Function
+		val parameterTypes = type.parameterTypes
+		val offset = type.hasReceiver.toInt()
+		if (type.hasReceiver)
+			sub.declare("this", type.receiverType!!.new(LLVM.LLVMGetParam(function.llvm, 0)))
+		for ((i, name) in prototype.parameterNames.withIndex())
+			sub.declare(name, parameterTypes[i].new(LLVM.LLVMGetParam(function.llvm, i + offset)))
 		with(sub) { body.codegen() }
 		declare(prototype.name, function)
 		return function

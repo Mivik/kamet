@@ -1,53 +1,51 @@
 package com.mivik.kamet
 
+import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.BlockNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.PrototypeNode
 import com.mivik.kamet.ast.ReturnNode
-import org.bytedeco.llvm.global.LLVM
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 
 internal class KametTest {
 	private fun String.parse(context: Context = Context.topLevel("evaluate")): Value =
 		with(Parser(this).takeExpr()) { context.codegenForThis() }
 
-	private fun String.evaluate(returnType: Type): GenericValue =
-		Context.topLevel("evaluate").let { context ->
-			val functionName = "eval"
-			val parser = Parser("{$this}")
-			val block = parser.takeBlock()
-			FunctionNode(
-				PrototypeNode(setOf(Attribute.NO_MANGLE), functionName, returnType, emptyList()),
-				BlockNode().also {
-					it.elements += ReturnNode(block)
-				}
-			).let { with(context) { it.codegen() } }
-			context.verify()?.let { msg ->
-				context.dump()
-				error("Verification failed: $msg")
+	private fun String.toType(): Type =
+		with(Context.topLevel("evaluate")) {
+			Parser(this@toType).takeType().resolve()
+		}
+
+	private fun String.evaluate(returnType: Type): GenericValue {
+		val functionName = "eval"
+		val context = FunctionNode(
+			PrototypeNode(
+				Attributes(setOf(Attribute.NO_MANGLE)),
+				functionName,
+				Type.Function(null, returnType, emptyList()),
+				emptyList()
+			),
+			BlockNode().also {
+				it.elements += ReturnNode(Parser("{$this}").takeBlock())
 			}
-			val engine = JITEngine(context)
-			val result = engine.run(functionName)
-			engine.dispose()
-			result
+		).codegen()
+		return JITEngine(context).use { run(functionName) }
+	}
+
+	private fun ASTNode.codegen(): Context =
+		Context.topLevel("evaluate").also {
+			with(it) { codegen() }
+			it.verify()?.let { msg -> error("Verification failed: $msg") }
 		}
 
-	private fun String.compile(): JITEngine =
-		Context.topLevel("evaluate").let { context ->
-			Parser(this).parse().let { with(context) { it.codegen() } }
-			context.verify()?.let { msg -> error("Verification failed: $msg") }
-			JITEngine(context)
-		}
-
+	private fun String.codegen(): Context = Parser(this).parse().codegen()
+	private fun String.compile(): JITEngine = JITEngine(codegen())
 	private fun String.runFunction(functionName: String, argument: GenericValue? = null): GenericValue =
-		Context.topLevel("evaluate").let {
-			val engine = compile()
-			val result =
-				if (argument == null) engine.run(functionName)
-				else engine.run(functionName, argument)
-			engine.dispose()
-			result
+		compile().use {
+			if (argument == null) run(functionName)
+			else run(functionName, argument)
 		}
 
 	@Suppress("NOTHING_TO_INLINE")
@@ -154,11 +152,16 @@ internal class KametTest {
 	fun `struct in function`() {
 		"""
 			fun test() {
-				struct A {
+				#[packed] struct A {
 					a: Int,
 					b: Double
 				}
+				struct B {
+					a: Int,
+					b: Boolean
+				}
 				val a: A
+				val b: B
 			}
 		""".trimIndent().tryCompile()
 	}
@@ -208,9 +211,94 @@ internal class KametTest {
 					modify(a)
 					return a[0]
 				}
-			""".trimIndent().compile().use {
-				run("test").int
-			}
+			""".trimIndent().runFunction("test").int
 		)
+	}
+
+	@Test
+	fun extern() {
+		assertFails {
+			"fun cos(x: Double): Double".tryCompile()
+		}
+		"#[extern] fun cos(x: Double): Double".tryCompile()
+	}
+
+	@Test
+	fun concat() {
+		assertEquals(
+			concat(listOf(1, 2), listOf(3)).toList(),
+			listOf(1, 2, 3)
+		)
+		assertEquals(
+			concat(listOf(1), listOf(2), emptyList()).toList(),
+			listOf(1, 2)
+		)
+	}
+
+	@Test
+	fun `unused attributes`() {
+		assertFails {
+			"""
+				fun test() {
+					#[extern]
+					val a: Int
+				}
+			""".trimIndent().tryCompile()
+		}
+	}
+
+	@Test
+	fun `function type`() {
+		assertEquals(
+			Type.Function(
+				null,
+				Type.Unit,
+				emptyList()
+			),
+			"() -> Unit".toType()
+		)
+		assertEquals(
+			Type.Function(null, Type.Primitive.Integral.Int, listOf(Type.Primitive.Integral.Int)),
+			"(Int) -> Int".toType()
+		)
+		assertEquals(
+			Type.Function(
+				Type.Primitive.Integral.Int,
+				Type.Unit,
+				listOf(Type.Primitive.Real.Double, Type.Primitive.Real.Double)
+			),
+			"Int.(Double, Double) -> Unit".toType()
+		)
+	}
+
+	@Test
+	fun generic() {
+		"""
+			struct Pair<A, B> {
+				first: A,
+				second: B
+			}
+			
+			fun test() {
+				var intPair: Pair<Int, Int>
+				intPair.first =  1
+				intPair.second = 2
+				var doublePair: Pair<Double, Double>
+				doublePair.first = 1.2
+				doublePair.second = 2.3
+			}
+		""".trimIndent().tryCompile()
+		assertFails {
+			"""
+				struct Wrapper<T> {
+					element: T
+				}
+				
+				fun test() {
+					var wrapper: Wrapper<Int>
+					wrapper.element = 1.2
+				}
+			""".trimIndent().tryCompile()
+		}
 	}
 }

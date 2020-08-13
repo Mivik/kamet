@@ -3,12 +3,12 @@ package com.mivik.kamet
 import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.BinOpNode
 import com.mivik.kamet.ast.BlockNode
+import com.mivik.kamet.ast.CallNode
 import com.mivik.kamet.ast.CastNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.IfNode
-import com.mivik.kamet.ast.CallNode
 import com.mivik.kamet.ast.NewNode
 import com.mivik.kamet.ast.PointerSubscriptNode
 import com.mivik.kamet.ast.PrototypeNode
@@ -30,6 +30,7 @@ internal class Parser(private val lexer: Lexer) {
 
 	private val readBuffer = LinkedList<Token>()
 	private var lastAttribute: Attributes? = null
+	private var attributeNewlySet = false
 
 	private fun take(): Token =
 		if (readBuffer.isEmpty()) lexer.lex()
@@ -61,7 +62,7 @@ internal class Parser(private val lexer: Lexer) {
 		return take()
 	}
 
-	private fun consumeAttrs(): Attributes = (lastAttribute ?: emptySet()).also { lastAttribute = null }
+	private fun consumeAttrs(): Attributes = (lastAttribute ?: Attributes()).also { lastAttribute = null }
 
 	private fun unexpected(token: Token): Nothing = error("Unexpected $token")
 
@@ -71,6 +72,27 @@ internal class Parser(private val lexer: Lexer) {
 			Token.LeftBracket -> 13
 			else -> -1
 		}
+
+	private fun clearAttributes() {
+		if (attributeNewlySet) attributeNewlySet = false
+		else if (lastAttribute != null) error("Unused attributes: $lastAttribute")
+	}
+
+	private fun takeAttributes() {
+		take().expect<Token.NumberSign>()
+		take().expect<Token.LeftBracket>()
+		lastAttribute = if (peek() != Token.RightBracket) {
+			val attrs = mutableSetOf<Attribute>()
+			while (true) {
+				val name = take().expect<Token.Identifier>().name
+				attrs += Attribute.lookup(name) ?: error("Unknown attribute ${name.escape()}")
+				if (peek() == Token.RightBracket) break
+			}
+			take()
+			Attributes(attrs.readOnly())
+		} else Attributes()
+		attributeNewlySet = true
+	}
 
 	@Suppress("NOTHING_TO_INLINE")
 	private inline fun makeOp(lhs: ASTNode?, rhs: ASTNode, op: Operator): ASTNode =
@@ -122,22 +144,15 @@ internal class Parser(private val lexer: Lexer) {
 	private fun takePrimary(): ASTNode =
 		when (val token = trimAndTake()) {
 			is Token.Null -> Value.NullPointer.direct()
+			Token.This -> ValueNode("this")
 			is Token.Identifier ->
 				if (peek() == Token.LeftParenthesis) {
 					take()
-					if (peek() != Token.RightParenthesis) {
-						val list = mutableListOf<ASTNode>()
-						while (true) {
-							list += takeExpr()
-							val splitter = take()
-							if (splitter == Token.RightParenthesis) break
-							else splitter.expect<Token.Comma>()
-						}
-						CallNode(token.name, null, list)
-					} else {
-						take()
-						CallNode(token.name, null, emptyList())
+					val list = mutableListOf<ASTNode>()
+					takeList(Token.RightParenthesis) {
+						list += takeExpr()
 					}
+					CallNode(null, token.name, list.readOnly())
 				} else ValueNode(token.name)
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
 			is Token.Constant -> ConstantNode(token.type, token.literal)
@@ -172,7 +187,7 @@ internal class Parser(private val lexer: Lexer) {
 			else -> takeStmt()
 		}
 
-	tailrec fun takeStmt(): ASTNode =
+	fun takeStmt(): ASTNode =
 		when (trimAndPeek()) {
 			Token.Struct -> takeStruct()
 			Token.Val -> {
@@ -233,8 +248,8 @@ internal class Parser(private val lexer: Lexer) {
 				DoWhileNode(block, condition)
 			}
 			Token.NumberSign -> {
-				lastAttribute = takeAttributes()
-				takeStmt()
+				takeAttributes()
+				takeStmt().also { clearAttributes() }
 			}
 			else -> takeExpr()
 		}
@@ -255,6 +270,16 @@ internal class Parser(private val lexer: Lexer) {
 		return block
 	}
 
+	private fun takeFunctionType(receiverType: Type?): Type.Function {
+		take().expect<Token.LeftParenthesis>()
+		val types = mutableListOf<Type>()
+		takeList(Token.RightParenthesis) {
+			types += takeType()
+		}
+		take().expect<Token.Arrow>()
+		return Type.Function(receiverType, takeType(), types)
+	}
+
 	fun takeType(): Type =
 		when (val token = trimAndTake()) {
 			BinOp.BitwiseAnd -> { // &(const )type
@@ -267,7 +292,27 @@ internal class Parser(private val lexer: Lexer) {
 				if (isConst) take()
 				Type.Pointer(takeType(), isConst)
 			}
-			Token.LeftParenthesis -> takeType().also { trimAndTake().expect<Token.RightParenthesis>() }
+			Token.LeftParenthesis ->
+				if (peek() == Token.RightParenthesis) {
+					off(token)
+					takeFunctionType(null)
+				} else {
+					takeType().let {
+						val after = trimAndTake()
+						if (after == Token.Comma) {
+							off(Token.DirectType(it))
+							off(Token.LeftParenthesis)
+							takeFunctionType(null)
+						} else {
+							after.expect<Token.RightParenthesis>()
+							if (peek() == Token.Arrow) {
+								take()
+								val returnType = takeType()
+								Type.Function(null, returnType, listOf(it))
+							} else it
+						}
+					}
+				}
 			Token.LeftBracket -> { // [(const )type, size]
 				val elementType = takeType()
 				val isConst = peek() == Token.Const
@@ -279,96 +324,115 @@ internal class Parser(private val lexer: Lexer) {
 				take().expect<Token.RightBracket>()
 				Type.Array(elementType, size.value.toLongIgnoringOverflow().toInt(), isConst)
 			}
-			is Token.Identifier -> {
-				val type = Type.Named(token.name)
-				if (peek() == Token.LeftParenthesis) {
+			is Token.Identifier ->
+				if (peek() == BinOp.Less) {
 					take()
-					val parameterTypes = mutableListOf<Type>()
-					if (peek() != Token.RightParenthesis)
-						while (true) {
-							parameterTypes += takeType()
-							val splitter = trimAndTake()
-							if (splitter == Token.RightParenthesis) break
-							else splitter.expect<Token.Comma>()
-						}
-					Type.Function(type, parameterTypes)
-				} else type
-			}
+					val list = mutableListOf<Type>()
+					takeList(BinOp.Greater) {
+						list += takeType()
+					}
+					Type.Generic(token.name, list.readOnly())
+				} else Type.Named(token.name)
 			else -> impossible()
+		}.let {
+			if (peek() == BinOp.AccessMember) {
+				take()
+				if (peek() == Token.LeftParenthesis) takeFunctionType(it)
+				else {
+					off(BinOp.AccessMember)
+					it
+				}
+			} else it
 		}
+
+	private inline fun takeList(until: Token, action: () -> Unit) {
+		if (trimAndPeek() == until) {
+			take()
+			return
+		}
+		while (true) {
+			action()
+			val splitter = trimAndTake()
+			if (splitter == until) break
+			else splitter.expect<Token.Comma>()
+		}
+	}
 
 	fun takePrototype(): PrototypeNode {
 		trimAndTake().expect<Token.Function>()
-		val name = trimAndTake().expect<Token.Identifier>().name
-		val args = mutableListOf<Pair<String, Type>>()
+		val type = takeType()
+		val hasReceiver = peek() == BinOp.AccessMember
+		val name =
+			if (hasReceiver) {
+				take()
+				take().expect<Token.Identifier>().name
+			} else type.expect<Type.Named>().name
+		val names = mutableListOf<String>()
+		val types = mutableListOf<Type>()
 		take().expect<Token.LeftParenthesis>()
-		if (trimAndPeek() != Token.RightParenthesis)
-			while (true) {
-				val argName = trimAndTake().expect<Token.Identifier>().name
-				trimAndTake().expect<Token.Colon>()
-				args.add(Pair(argName, takeType()))
-				val splitter = trimAndTake()
-				if (splitter == Token.RightParenthesis) break
-				else splitter.expect<Token.Comma>()
-			}
-		else take()
-		return if (trimAndPeek() == Token.Colon) {
-			take()
-			PrototypeNode(consumeAttrs(), name, takeType(), args)
-		} else PrototypeNode(consumeAttrs(), name, Type.Unit, args)
+		takeList(Token.RightParenthesis) {
+			names += trimAndTake().expect<Token.Identifier>().name
+			trimAndTake().expect<Token.Colon>()
+			types += takeType()
+		}
+		val returnType =
+			if (trimAndPeek() == Token.Colon) {
+				take()
+				takeType()
+			} else Type.Unit
+		return PrototypeNode(
+			consumeAttrs(),
+			name,
+			Type.Function(if (hasReceiver) type else null, returnType, types.readOnly()),
+			names.readOnly()
+		)
 	}
 
 	@Suppress("NOTHING_TO_INLINE")
 	inline fun takeFunctionOrPrototype(): ASTNode {
 		val prototype = takePrototype()
-		return if (peek() is Token.LeftBrace) FunctionNode(prototype, takeBlock().also {
-			if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.returnType))
-		})
+		return if (peek() is Token.LeftBrace)
+			FunctionNode(prototype, takeBlock().also {
+				if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.type.returnType))
+			})
 		else prototype
-	}
-
-	private fun takeAttributes(): Attributes {
-		take().expect<Token.NumberSign>()
-		take().expect<Token.LeftBracket>()
-		return if (peek() != Token.RightBracket) {
-			val set = mutableSetOf<Attribute>()
-			while (true) {
-				val name = take().expect<Token.Identifier>().name
-				set.add(Attribute.lookup(name) ?: error("Unknown attribute \"$name\""))
-				if (peek() == Token.RightBracket) break
-			}
-			take()
-			set
-		} else emptySet()
 	}
 
 	fun takeStruct(): StructNode {
 		take().expect<Token.Struct>()
 		val name = trimAndTake().expect<Token.Identifier>().name
-		val elements = mutableListOf<Pair<String, Type>>()
-		trimAndTake().expect<Token.LeftBrace>()
-		if (trimAndPeek() != Token.RightBrace)
-			while (true) {
-				val elementName = trimAndTake().expect<Token.Identifier>().name
-				trimAndTake().expect<Token.Colon>()
-				elements.add(Pair(elementName, takeType()))
-				val splitter = trimAndTake()
-				if (splitter == Token.RightBrace) break
-				else splitter.expect<Token.Comma>()
+		val parameterNames: List<String>
+		if (peek() == BinOp.Less) {
+			take()
+			parameterNames = mutableListOf()
+			takeList(BinOp.Greater) {
+				parameterNames += take().expect<Token.Identifier>().name
 			}
-		return StructNode(consumeAttrs(), name, elements)
+		} else parameterNames = emptyList()
+		take().expect<Token.LeftBrace>()
+		val list = mutableListOf<Pair<String, Type>>()
+		takeList(Token.RightBrace) {
+			val memberName = trimAndTake().expect<Token.Identifier>().name
+			trimAndTake().expect<Token.Colon>()
+			list += Pair(memberName, takeType())
+		}
+		return StructNode(consumeAttrs(), name, list.readOnly(), parameterNames.readOnly())
 	}
 
 	fun parse(): TopLevelNode {
 		val list = mutableListOf<ASTNode>()
 		while (true) {
 			when (trimAndPeek()) {
-				Token.Function -> list += takeFunctionOrPrototype()
+				Token.Function -> list += takeFunctionOrPrototype().also {
+					if (it is PrototypeNode)
+						require(it.extern) { "Function without implementation is not allowed." }
+				}
 				Token.Struct -> list += takeStruct()
-				Token.EOF -> return TopLevelNode(list)
-				Token.NumberSign -> lastAttribute = takeAttributes()
+				Token.NumberSign -> takeAttributes()
+				Token.EOF -> return TopLevelNode(list.readOnly())
 				else -> TODO()
 			}
+			clearAttributes()
 		}
 	}
 }

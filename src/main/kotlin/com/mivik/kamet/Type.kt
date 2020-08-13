@@ -1,34 +1,37 @@
 package com.mivik.kamet
 
-import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
+import org.kiot.util.contentEquals
 
 sealed class Type(val name: String) {
 	companion object {
-		val defaultTypes = arrayOf(
-			Nothing,
-			Unit,
-			Primitive.Boolean,
-			Primitive.Integral.Char,
-			Primitive.Integral.Byte,
-			Primitive.Integral.UByte,
-			Primitive.Integral.Short,
-			Primitive.Integral.UShort,
-			Primitive.Integral.Int,
-			Primitive.Integral.UInt,
-			Primitive.Integral.Long,
-			Primitive.Integral.ULong,
-			Primitive.Real.Float,
-			Primitive.Real.Double
-		)
+		private val defaultTypes by lazy {
+			arrayOf(
+				Nothing,
+				Unit,
+				Primitive.Boolean,
+				Primitive.Integral.Char,
+				Primitive.Integral.Byte,
+				Primitive.Integral.UByte,
+				Primitive.Integral.Short,
+				Primitive.Integral.UShort,
+				Primitive.Integral.Int,
+				Primitive.Integral.UInt,
+				Primitive.Integral.Long,
+				Primitive.Integral.ULong,
+				Primitive.Real.Float,
+				Primitive.Real.Double
+			)
+		}
 
-		fun defaultTypeMap(): MutableMap<String, Type> =
-			mutableMapOf<String, Type>().apply {
+		val defaultTypeMap: PersistentMap<String, Type> by lazy {
+			PersistentMap<String, Type>().apply {
 				for (type in defaultTypes)
 					this[type.name] = type
 			}
+		}
 
 		val pointerAddressType = Primitive.Integral.ULong
 	}
@@ -37,43 +40,41 @@ sealed class Type(val name: String) {
 
 	open fun dereference(): Type = this
 
-	abstract fun Context.resolveForThis(): Type
-
+	abstract fun Context.resolveForThis(newName: String): Type
 	abstract val llvm: LLVMTypeRef
 
 	fun undefined(): Value = new(LLVM.LLVMGetUndef(llvm))
-
 	fun new(llvm: LLVMValueRef): Value = Value(llvm, this)
 
+	open fun asPointerOrNull(): Pointer? = null
 	inline val isPointer get() = asPointerOrNull() != null
 
-	open fun asPointerOrNull(): Pointer? = null
-
-	object Nothing : Type("Nothing") {
-		override fun Context.resolveForThis(): Type = this@Nothing
-
-		override val llvm: LLVMTypeRef by lazy { LLVM.LLVMVoidType() }
+	abstract class Composed(name: String) : Type(name)
+	abstract class Unresolved(name: String) : Type(name) {
+		override val llvm: LLVMTypeRef
+			get() = error("Getting the real type of an unresolved type: ${name.escape()}")
 	}
 
-	object Unit : Type("Unit") {
-		override fun Context.resolveForThis(): Type = this@Unit
-
+	object Nothing : Type("Nothing") {
+		override fun Context.resolveForThis(newName: String): Type = this@Nothing
 		override val llvm: LLVMTypeRef = LLVM.LLVMVoidType()
 	}
 
-	class Named(name: String) : Type(name) {
-		override fun Context.resolveForThis(): Type = lookupType(name)
+	object Unit : Type("Unit") {
+		override fun Context.resolveForThis(newName: String): Type = this@Unit
+		override val llvm: LLVMTypeRef = LLVM.LLVMVoidType()
+	}
 
-		override val llvm: LLVMTypeRef
-			get() = error("Getting the real type of an unresolved type: $name")
+	class Named(name: String) : Unresolved(name) {
+		override fun Context.resolveForThis(newName: String): Type = lookupType(name)
 	}
 
 	class Array(
 		val elementType: Type,
 		val size: Int,
 		val isConst: Boolean
-	) : Type("[${if (isConst) "const " else ""}$elementType, $size]") {
-		override fun Context.resolveForThis(): Type = Array(elementType.resolve(), size, isConst)
+	) : Type("[${isConst.ifThat { "const " }}$elementType, $size]") {
+		override fun Context.resolveForThis(newName: String): Type = Array(elementType.resolve(), size, isConst)
 
 		override val llvm: LLVMTypeRef by lazy { LLVM.LLVMArrayType(elementType.llvm, size) }
 
@@ -88,45 +89,58 @@ sealed class Type(val name: String) {
 		}
 	}
 
-	class Function(val returnType: Type, val parameterTypes: List<Type>) :
-		Type("$returnType(${parameterTypes.joinToString()})") {
-		override fun Context.resolveForThis(): Type =
-			Function(returnType.resolve(), parameterTypes.map { it.resolve() })
+	class Function(val receiverType: Type?, val returnType: Type, val parameterTypes: List<Type>) :
+		Composed("${receiverType.ifNotNull { "$receiverType." }}(${parameterTypes.joinToString()}):$returnType") {
+		inline val hasReceiver get() = receiverType != null
+
+		override fun Context.resolveForThis(newName: String): Type =
+			Function(receiverType?.resolve(), returnType.resolve(), parameterTypes.map { it.resolve() })
 
 		override val llvm: LLVMTypeRef by lazy {
+			val size = parameterTypes.size + hasReceiver.toInt()
 			LLVM.LLVMFunctionType(
 				returnType.llvm,
-				PointerPointer(*Array(parameterTypes.size) { parameterTypes[it].llvm }),
-				parameterTypes.size,
+				if (receiverType == null)
+					buildPointerPointer(size) { parameterTypes[it].llvm }
+				else
+					buildPointerPointer(size) {
+						if (it == 0) receiverType.llvm
+						else parameterTypes[it - 1].llvm
+					},
+				size,
 				0
 			)
 		}
 
 		override fun equals(other: Any?): Boolean =
-			if (other is Function) returnType == other.returnType && parameterTypes == other.parameterTypes
+			if (other is Function)
+				receiverType == other.receiverType &&
+						returnType == other.returnType &&
+						parameterTypes.contentEquals(other.parameterTypes)
 			else false
 
 		override fun hashCode(): Int {
-			var result = returnType.hashCode()
+			var result = receiverType.hashCode()
+			result = 31 * result + returnType.hashCode()
 			result = 31 * result + parameterTypes.hashCode()
 			return result
 		}
 	}
 
-	class Struct(name: String, val elements: List<Pair<String, Type>>, private val packed: Boolean) : Type(name) {
-		override fun Context.resolveForThis(): Type =
-			Struct(name, elements.map { Pair(it.first, it.second.resolve()) }, packed)
+	class Struct(name: String, val elements: List<Pair<String, Type>>, private val packed: Boolean) : Composed(name) {
+		override fun Context.resolveForThis(newName: String): Type =
+			Struct(newName, elements.map { Pair(it.first, it.second.resolve()) }, packed)
 
 		override val llvm: LLVMTypeRef by lazy {
 			LLVM.LLVMStructType(
-				PointerPointer(*Array(elements.size) { elements[it].second.llvm }),
+				buildPointerPointer(elements.size) { elements[it].second.llvm },
 				elements.size,
 				packed.toInt()
 			)
 		}
 
 		fun memberIndex(name: String) = elements.indexOfFirst { it.first == name }.also {
-			if (it == -1) error("Struct type ${this.name} has no member named $name")
+			if (it == -1) error("Struct type ${this.name.escape()} has no member named ${name.escape()}")
 		}
 
 		@Suppress("NOTHING_TO_INLINE")
@@ -137,7 +151,7 @@ sealed class Type(val name: String) {
 	}
 
 	sealed class Primitive(name: String, val sizeInBits: Int, override val llvm: LLVMTypeRef) : Type(name) {
-		override fun Context.resolveForThis(): Type = this@Primitive
+		override fun Context.resolveForThis(newName: String): Type = this@Primitive
 
 		object Boolean : Primitive("Boolean", 1, LLVM.LLVMIntType(1))
 
@@ -162,14 +176,14 @@ sealed class Type(val name: String) {
 	}
 
 	class Reference(val originalType: Type, val isConst: Boolean) :
-		Type("&${if (isConst) "const " else ""}($originalType)") {
+		Type("&${isConst.ifThat { "const " }}($originalType)") {
 		init {
 			require(originalType !is Reference) { "Creating a reference of a reference" }
 		}
 
-		override fun Context.resolveForThis(): Type = Reference(originalType.resolve(), isConst)
+		override fun Context.resolveForThis(newName: String): Type = Reference(originalType.resolve(), isConst)
 
-		override val llvm: LLVMTypeRef by lazy { originalType.llvm.pointer()}
+		override val llvm: LLVMTypeRef by lazy { originalType.llvm.pointer() }
 
 		override fun asPointerOrNull(): Pointer? =
 			if (originalType is Array) originalType.elementType.pointer(originalType.isConst)
@@ -186,14 +200,14 @@ sealed class Type(val name: String) {
 	}
 
 	class Pointer(val elementType: Type, val isConst: Boolean) :
-		Type("*${if (isConst) "const " else ""}($elementType)") {
+		Type("*${isConst.ifThat { "const " }}($elementType)") {
 		init {
 			require(elementType !is Reference) { "Creating a pointer to a reference" }
 		}
 
-		override fun Context.resolveForThis(): Type = Pointer(elementType.resolve(), isConst)
+		override fun Context.resolveForThis(newName: String): Type = Pointer(elementType.resolve(), isConst)
 
-		override val llvm: LLVMTypeRef by lazy { elementType.llvm.pointer()}
+		override val llvm: LLVMTypeRef by lazy { elementType.llvm.pointer() }
 
 		override fun asPointerOrNull(): Pointer? = this
 
@@ -203,6 +217,12 @@ sealed class Type(val name: String) {
 			else false
 
 		override fun hashCode(): Int = elementType.hashCode()
+	}
+
+	class Generic(val genericName: String, val arguments: List<Type>) :
+		Unresolved("$genericName<${arguments.joinToString()}>") {
+		override fun Context.resolveForThis(newName: String): Type =
+			lookupGeneric(genericName).resolve(arguments.map { it.resolve() })
 	}
 }
 

@@ -33,6 +33,15 @@ internal sealed class Token {
 	object Null : Token()
 	object SizeOf : Token()
 	object New : Token()
+	object Trait : Token()
+	object This : Token()
+	object ThisType : Token()
+	object Impl : Token()
+	object Arrow : Token()
+
+	class DirectType(val type: Type) : Token() {
+		override fun toString(): String = "Type($type)"
+	}
 
 	class Identifier(val name: String) : Token() {
 		override fun toString(): String = "Identifier($name)"
@@ -104,8 +113,8 @@ private enum class State : LexerState {
 
 private enum class Action : LexerAction {
 	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL,
-	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL, NEW, DELETE,
-	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN
+	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL, NEW, DELETE, THIS_TYPE,
+	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN, IMPL, TRAIT, THIS
 }
 
 internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
@@ -120,7 +129,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"\r|\n|\r\n" action Action.NEWLINE
 				"<<=" action Action.SHIFT_LEFT_ASSIGN
 				">>=" action Action.SHIFT_RIGHT_ASSIGN
-				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--" action Action.DOUBLE_CHAR_OPERATOR
+				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--|->" action Action.DOUBLE_CHAR_OPERATOR
 				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,=~!#\\[\\]\\.]" action Action.SINGLE_CHAR_OPERATOR
 				"'(\\\\u[0-9a-fA-F]{4}|\\\\.|.)'" action Action.CHAR_LITERAL
 				"val" action Action.VAL
@@ -138,7 +147,11 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"else" action Action.ELSE
 				"new" action Action.NEW
 				"delete" action Action.DELETE
+				"impl" action Action.IMPL
+				"this" action Action.THIS
+				"This" action Action.THIS_TYPE
 				"true|false" action Action.BOOLEAN_LITERAL
+				"trait" action Action.TRAIT
 				"[\\w\$_][\\w\\d\$_]*" action Action.IDENTIFIER
 				"\\d+UL" action Action.UNSIGNED_LONG_LITERAL
 				"\\d+U" action Action.UNSIGNED_INT_LITERAL
@@ -178,7 +191,11 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.SIZEOF -> returnValue(Token.SizeOf)
 			Action.NEW -> returnValue(Token.New)
 			Action.DELETE -> returnValue(UnaryOp.Delete)
+			Action.THIS -> returnValue(Token.This)
+			Action.THIS_TYPE -> returnValue(Token.ThisType)
+			Action.IMPL -> returnValue(Token.Impl)
 			Action.IDENTIFIER -> returnValue(Token.Identifier(string()))
+			Action.TRAIT -> returnValue(Token.Trait)
 			Action.CHAR_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Integral.Char))
 			Action.DOUBLE_LITERAL -> returnValue(Token.Constant(string(), Type.Primitive.Real.Double))
 			Action.UNSIGNED_INT_LITERAL ->
@@ -211,6 +228,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					"&=" -> BinOp.BitwiseAndAssign
 					"|=" -> BinOp.BitwiseOrAssign
 					"^=" -> BinOp.XorAssign
+					"->" -> Token.Arrow
 					else -> impossible()
 				}
 			)
