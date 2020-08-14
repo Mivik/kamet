@@ -14,20 +14,15 @@ enum class Attribute {
 }
 
 class Attributes(val set: Set<Attribute> = emptySet()) : Set<Attribute> by set {
-	fun verify(name: String, accepted: Set<Attribute>) = apply {
-		forEach {
-			if (it !in accepted) it.notApplicableTo(name)
-		}
-	}
-
-	override fun toString(): String = "#[${set.joinToString(" ") { it.name.toUpperCase() }}]"
+	override fun toString(): String =
+		set.isNotEmpty().ifThat { "#[${set.joinToString(" ") { it.name.toUpperCase() }}]" }
 }
 
 class AttributesBuilder {
 	private val set = mutableSetOf<Attribute>()
 
 	operator fun Attribute.unaryPlus() {
-		set  += this
+		set += this
 	}
 
 	fun build() = Attributes(set.readOnly())

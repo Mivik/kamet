@@ -21,9 +21,10 @@ class Context(
 	val builder: LLVMBuilderRef,
 	val currentFunction: Value?,
 	private val valueMap: PersistentMap<String, Value>,
+	private val internalMap: PersistentMap<String, Any>,
 	private val typeMap: PersistentMap<String, Type>,
 	private val functionMap: PersistentMap<String, MutableList<Function>>,
-	private val genericMap: PersistentMap<String, GenericType>
+	private val genericMap: PersistentMap<String, Generic>,
 ) : Disposable {
 	companion object {
 		fun topLevel(moduleName: String): Context =
@@ -32,6 +33,7 @@ class Context(
 				LLVM.LLVMModuleCreateWithName(moduleName),
 				LLVM.LLVMCreateBuilder(),
 				null,
+				PersistentMap(),
 				PersistentMap(),
 				Type.defaultTypeMap.subMap(),
 				PersistentMap(),
@@ -44,6 +46,8 @@ class Context(
 
 	fun lookupValueOrNull(name: String) = valueMap[name]
 	fun lookupValue(name: String) = valueMap[name] ?: error("Unknown identifier ${name.escape()}")
+	fun lookupInternalOrNull(name: String) = internalMap[name]
+	fun lookupInternal(name: String) = internalMap[name] ?: error("Unknown internal identifier ${name.escape()}")
 	fun lookupTypeOrNull(name: String) = typeMap[name]
 	fun lookupType(name: String) = typeMap[name] ?: error("Unknown type ${name.escape()}")
 	fun lookupGenericOrNull(name: String) = genericMap[name]
@@ -58,22 +62,27 @@ class Context(
 		typeMap[name] = type
 	}
 
-	fun declareGeneric(name: String, generic: GenericType) {
+	fun declareGeneric(name: String, generic: Generic) {
 		if (genericMap.containsKey(name)) error("Redeclaration of generic type ${name.escape()}")
 		genericMap[name] = generic
+	}
+
+	fun declareInternal(name: String, value: Any) {
+		internalMap[name] = value
 	}
 
 	fun declare(name: String, value: Value) {
 		valueMap[name] = value
 	}
 
-	fun subContext(currentFunction: Value? = this.currentFunction): Context =
+	fun subContext(currentFunction: Value? = this.currentFunction, topLevel: Boolean = false): Context =
 		Context(
 			this,
 			module,
-			builder,
+			if (topLevel) LLVM.LLVMCreateBuilder() else builder,
 			currentFunction,
 			valueMap.subMap(),
+			internalMap.subMap(),
 			typeMap.subMap(),
 			functionMap.subMap(),
 			genericMap.subMap()
@@ -83,7 +92,7 @@ class Context(
 		LLVM.LLVMPositionBuilderAtEnd(builder, block)
 	}
 
-	inline val currentBlock get() = LLVM.LLVMGetInsertBlock(builder)
+	inline val currentBlock: LLVMBasicBlockRef? get() = LLVM.LLVMGetInsertBlock(builder)
 
 	internal fun basicBlock(name: String = "block") = LLVM.LLVMAppendBasicBlock(llvmFunction, name)
 
@@ -102,9 +111,9 @@ class Context(
 	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
 	internal inline fun Type.sizeOf() = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
-	internal inline fun Type.resolve(newName: String = name) = resolveForThis(newName)
+	internal inline fun Type.resolve() = resolveForThis()
 	internal inline fun Function.invoke(receiver: Value?, arguments: List<Value>) = invokeForThis(receiver, arguments)
-	internal inline fun GenericType.resolve(arguments: List<Type>) = buildForThis(arguments)
+	internal inline fun Generic.resolve(arguments: List<Type>) = resolveForThis(arguments)
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
@@ -187,7 +196,7 @@ internal inline fun Context.doInside(block: LLVMBasicBlockRef, action: Context.(
 	contract {
 		callsInPlace(action, InvocationKind.EXACTLY_ONCE)
 	}
-	val origin = currentBlock
+	val origin = currentBlock!!
 	insertAt(block)
 	this.action()
 	return LLVM.LLVMGetInsertBlock(builder).also { insertAt(origin) }

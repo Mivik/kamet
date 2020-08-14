@@ -76,6 +76,24 @@ internal fun <T> Set<T>.readOnly() =
 		else -> this
 	}
 
+internal fun genericName(baseName: String, typeParameters: List<Type>) =
+	"$baseName<${typeParameters.joinToString()}>"
+
+internal fun Function.match(receiverType: Type?, argumentTypes: List<Type>): Boolean {
+	val type = type
+	val parameterTypes = type.parameterTypes
+	if (argumentTypes.size != parameterTypes.size) return false
+	if (receiverType == null) {
+		if (type.receiverType != null) return false
+	} else {
+		if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return false
+	}
+	return argumentTypes.indices.all { argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }
+}
+
+internal fun noMatchingFunction(name: String, argumentTypes: List<Type>): Nothing =
+	error("No matching function for call to ${name.escape()} with argument types: (${argumentTypes.joinToString()})")
+
 internal fun findMatchingFunction(
 	name: String,
 	alternatives: Iterable<Function>,
@@ -84,21 +102,12 @@ internal fun findMatchingFunction(
 ): Function {
 	val functions = alternatives.iterator().takeIf { it.hasNext() } ?: error("No function named ${name.escape()}")
 	var found: Function? = null
-	val argStr by lazy { argumentTypes.joinToString { it.name } }
 	for (function in functions) {
-		val type = function.type
-		val parameterTypes = type.parameterTypes
-		if (argumentTypes.size != parameterTypes.size) continue
-		if (receiverType == null) {
-			if (type.receiverType != null) continue
-		} else {
-			if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) continue
-		}
-		if (argumentTypes.indices.any { !argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }) continue
+		if (!function.match(receiverType, argumentTypes)) continue
 		if (found == null) found = function
-		else error("Ambiguous call to function ${name.escape()}: ${function.type} and ${found.type} are both applicable to arguments ($argStr)")
+		else error("Ambiguous call to function ${name.escape()}: ${function.type} and ${found.type} are both applicable to arguments (${argumentTypes.joinToString()})")
 	}
-	return found ?: error("No matching function for call to ${name.escape()} with argument types: ($argStr)")
+	return found ?: noMatchingFunction(name, argumentTypes)
 }
 
 internal fun <T : Pointer> List<T>.toPointerPointer() =

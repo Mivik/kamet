@@ -3,16 +3,17 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Attribute
 import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
-import com.mivik.kamet.GenericType
+import com.mivik.kamet.Generic
 import com.mivik.kamet.Type
+import com.mivik.kamet.TypeParameter
 import com.mivik.kamet.Value
+import com.mivik.kamet.genericName
 import com.mivik.kamet.ifThat
 
 internal class StructNode(
-	attributes: Attributes,
+	val attributes: Attributes,
 	name: String,
-	elements: List<Pair<String, Type>>,
-	val parameterNames: List<String>
+	elements: List<Pair<String, Type>>
 ) : ASTNode {
 	val packed: Boolean
 	val type: Type.Struct
@@ -20,25 +21,39 @@ internal class StructNode(
 	init {
 		var packed = false
 		for (attr in attributes)
-			if (attr == Attribute.PACKED) packed = true
-			else attr.notApplicableTo("Struct")
+			when (attr) {
+				Attribute.PACKED -> packed = true
+				else -> attr.notApplicableTo("Struct")
+			}
 		this.packed = packed
 		type = Type.Struct(name, elements, this.packed)
 	}
 
 	override fun Context.codegenForThis(): Value {
-		if (parameterNames.isEmpty())
-			declareType(type.resolve())
-		else
-			declareGeneric(type.name, GenericType(type, parameterNames))
+		declareType(type.resolve())
 		return Value.Unit
 	}
 
 	override fun toString(): String = with(type) {
-		"${packed.ifThat { "#[packed] " }}struct $name {${
+		"${attributes}struct $name {${
 			elements.isNotEmpty().ifThat {
 				"\n\t" + elements.joinToString(",\n\t") { "${it.first}: ${it.second}" } + "\n"
 			}
 		}}"
+	}
+}
+
+internal class GenericStructNode(
+	val attributes: Attributes,
+	val name: String,
+	val elements: List<Pair<String, Type>>,
+	val typeParameters: List<TypeParameter>
+) : ASTNode {
+	override fun Context.codegenForThis(): Value {
+		declareGeneric(name, object : Generic(name, typeParameters) {
+			override fun Context.instantiate(arguments: List<Type>): Any =
+				StructNode(attributes, genericName(name, arguments), elements).type.resolve()
+		})
+		return Value.Unit
 	}
 }

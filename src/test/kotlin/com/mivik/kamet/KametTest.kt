@@ -8,6 +8,7 @@ import com.mivik.kamet.ast.ReturnNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertTrue
 
 internal class KametTest {
 	private fun String.parse(context: Context = Context.topLevel("evaluate")): Value =
@@ -37,7 +38,10 @@ internal class KametTest {
 	private fun ASTNode.codegen(): Context =
 		Context.topLevel("evaluate").also {
 			with(it) { codegen() }
-			it.verify()?.let { msg -> error("Verification failed: $msg") }
+			it.verify()?.let { msg ->
+				it.dump()
+				error("Verification failed: $msg")
+			}
 		}
 
 	private fun String.codegen(): Context = Parser(this).parse().codegen()
@@ -300,5 +304,58 @@ internal class KametTest {
 				}
 			""".trimIndent().tryCompile()
 		}
+	}
+
+	@Test
+	fun `function with receiver`() {
+		assertEquals(
+			25,
+			"""
+				fun Int.sqr(): Int { return this*this }
+				
+				#[no_mangle] fun test(): Int { return 5.sqr() }
+			""".trimIndent().runFunction("test").int
+		)
+		assertEquals(
+			3,
+			"""
+				struct Test {
+					a: Int,
+					b: Int
+				}
+				
+				fun &Test.sum(): Int { return this.a+this.b }
+				
+				#[no_mangle] fun test(): Int {
+					var test: Test
+					test.a = 1
+					test.b = 2
+					return test.sum()
+				}
+			""".trimIndent().runFunction("test").int
+		)
+	}
+
+	@Test
+	fun `generic function`() {
+		assertEquals(
+			4,
+			"""
+				fun <T> max(a: T, b: T): T { return if (a>b) a else b }
+				
+				#[no_mangle] fun test(): Int {
+					return max<Int>(max<Int>(1, 3), max<Int>(2, 4))
+				}
+			""".trimIndent().runFunction("test").int
+		)
+		assertTrue(
+			"""
+				fun <T> T.lessThan(other: T): Boolean { return this<other }
+				
+				#[no_mangle] fun test(): Boolean {
+					return 1.lessThan<Int>(2) && (2.3).lessThan<Double>(4.5)
+				}
+			""".trimIndent().runFunction("test").boolean
+		)
 	}
 }
