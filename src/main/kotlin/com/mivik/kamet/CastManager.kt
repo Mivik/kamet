@@ -47,13 +47,13 @@ internal object CastManager {
 			else -> null
 		}
 
-	fun Context.implicitCast(from: Value, to: Type): Value =
+	internal fun Context.implicitCast(from: Value, to: Type): Value =
 		implicitCastOrNull(from, to) ?: fail(from, to)
 
 	@Suppress("NOTHING_TO_INLINE")
 	inline fun fail(from: Value, to: Type): Nothing = error("Attempt to cast a ${from.type} into $to")
 
-	fun Context.explicitCastOrNull(from: Value, dest: Type): Value? {
+	internal fun Context.explicitCastOrNull(from: Value, dest: Type): Value? {
 		implicitCastOrNull(from, dest)?.let { return it }
 		val fromIsPointer = from.type.isPointer
 		val destIsPointer = dest.isPointer
@@ -122,7 +122,7 @@ internal object CastManager {
 		}
 	}
 
-	fun Context.explicitCast(from: Value, to: Type) = explicitCastOrNull(from, to) ?: fail(from, to)
+	internal fun Context.explicitCast(from: Value, to: Type) = explicitCastOrNull(from, to) ?: fail(from, to)
 }
 
 @Suppress("NOTHING_TO_INLINE")

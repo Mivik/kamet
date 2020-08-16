@@ -5,18 +5,23 @@ import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
 import com.mivik.kamet.Function
 import com.mivik.kamet.Type
+import com.mivik.kamet.TypeParameter
 import com.mivik.kamet.Value
+import com.mivik.kamet.genericName
 import com.mivik.kamet.ifNotNull
 import com.mivik.kamet.ifThat
 import com.mivik.kamet.toInt
 import org.bytedeco.llvm.global.LLVM
+
+private fun buildString(attributes: Attributes, name: String, type: Type.Function, parameterNames: List<String>) =
+	"${attributes}fun ${type.receiverType.ifNotNull { "${type.receiverType}." }}$name(${parameterNames.indices.joinToString { "${parameterNames[it]}: ${type.parameterTypes[it]}" }}): ${type.returnType}"
 
 internal class PrototypeNode(
 	val attributes: Attributes,
 	val name: String,
 	val type: Type.Function,
 	val parameterNames: List<String>
-) : ASTNode {
+) : AbstractFunctionNode() {
 	val noMangle: Boolean
 	val extern: Boolean
 
@@ -48,8 +53,15 @@ internal class PrototypeNode(
 		}
 	}
 
-	fun rename(newName: String): PrototypeNode =
-		PrototypeNode(attributes, newName, type, parameterNames)
+	override fun Context.directCodegenForThis(newName: String?): Value {
+		val renamed =
+			if (newName == null) this@PrototypeNode
+			else PrototypeNode(attributes, newName, type, parameterNames)
+		return renamed.codegen()
+	}
+
+	override val prototype: PrototypeNode
+		get() = this
 
 	override fun Context.codegenForThis(): Value {
 		val type = type.resolve() as Type.Function
@@ -64,5 +76,18 @@ internal class PrototypeNode(
 	}
 
 	override fun toString(): String =
-		"${attributes}fun ${type.receiverType.ifNotNull { "${type.receiverType}." }}$name(${parameterNames.indices.joinToString { "${parameterNames[it]}: ${type.parameterTypes[it]}" }}): ${type.returnType}"
+		buildString(attributes, name, type, parameterNames)
+}
+
+internal class GenericPrototypeNode(
+	val node: PrototypeNode,
+	val typeParameters: List<TypeParameter>
+) : ASTNode {
+	override fun Context.codegenForThis(): Value {
+		declareFunction(node, Function.Generic(node, typeParameters))
+		return Value.Unit
+	}
+
+	override fun toString(): String =
+		buildString(node.attributes, genericName(node.name, typeParameters), node.type, node.parameterNames)
 }

@@ -68,7 +68,7 @@ sealed class Type : Resolvable {
 		override val resolved: Boolean
 			get() = false
 
-		override fun Context.resolveForThis() = lookupTypeOrNull(name) ?: this@Named
+		override fun Context.resolveForThis() = lookupType(name)
 
 		override fun toString(): String = name
 	}

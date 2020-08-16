@@ -8,6 +8,8 @@ import com.mivik.kamet.ast.CastNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
+import com.mivik.kamet.ast.GenericFunctionNode
+import com.mivik.kamet.ast.GenericPrototypeNode
 import com.mivik.kamet.ast.GenericStructNode
 import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.NewNode
@@ -157,8 +159,13 @@ internal class Parser(private val lexer: Lexer) {
 			Token.This -> ValueNode("this")
 			is Token.Identifier ->
 				when (peek()) {
-					Token.LeftParenthesis, BinOp.Less ->
-						CallNode(Function.Named(token.name), null, takeArguments(), takeTypeArguments())
+					Token.LeftParenthesis, BinOp.Less -> {
+						val function = takeTypeArguments().let {
+							if (it.isEmpty()) Function.Named(token.name)
+							else Function.ActualGeneric(token.name, it)
+						}
+						CallNode(function, null, takeArguments())
+					}
 					else -> ValueNode(token.name)
 				}
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
@@ -387,8 +394,9 @@ internal class Parser(private val lexer: Lexer) {
 		}
 	}
 
-	fun takePrototype(): PrototypeNode {
+	fun takePrototype(): ASTNode {
 		trimAndTake().expect<Token.Function>()
+		val typeParameters = takeTypeParameterList()
 		val type = takeType()
 		val hasReceiver = peek() == BinOp.AccessMember
 		val name =
@@ -410,17 +418,28 @@ internal class Parser(private val lexer: Lexer) {
 				takeType()
 			} else Type.Unit
 		val functionType = Type.Function(if (hasReceiver) type else null, returnType, types.readOnly())
-		return PrototypeNode(consumeAttrs(), name, functionType, names.readOnly())
+		return PrototypeNode(consumeAttrs(), name, functionType, names.readOnly()).let {
+			if (typeParameters.isEmpty()) it
+			else GenericPrototypeNode(it, typeParameters)
+		}
 	}
 
 	@Suppress("NOTHING_TO_INLINE")
 	inline fun takeFunctionOrPrototype(): ASTNode {
 		val prototype = takePrototype()
-		return if (peek() is Token.LeftBrace)
-			FunctionNode(prototype, takeBlock().also {
-				if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.type.returnType))
-			})
-		else prototype
+		return if (peek() is Token.LeftBrace) {
+			val block = takeBlock()
+			if (prototype is PrototypeNode)
+				FunctionNode(prototype, block.also {
+					if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.type.returnType))
+				})
+			else {
+				prototype as GenericPrototypeNode
+				GenericFunctionNode(FunctionNode(prototype.node, block.also {
+					if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.node.type.returnType))
+				}), prototype.typeParameters)
+			}
+		} else prototype
 	}
 
 	fun takeStruct(): ASTNode {

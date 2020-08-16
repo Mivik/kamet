@@ -1,18 +1,20 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
+import com.mivik.kamet.Function
 import com.mivik.kamet.Type
+import com.mivik.kamet.TypeParameter
 import com.mivik.kamet.Value
 import com.mivik.kamet.toInt
 import org.bytedeco.llvm.global.LLVM
 
 internal class FunctionNode(
-	val prototype: PrototypeNode,
+	override val prototype: PrototypeNode,
 	val body: BlockNode
-) : ASTNode {
-	override fun Context.codegenForThis(): Value {
+) : AbstractFunctionNode() {
+	override fun Context.directCodegenForThis(newName: String?): Value {
 		if (hasValue(prototype.functionName)) error("Redeclaration: ${prototype.functionName}")
-		val function = prototype.codegen()
+		val function = prototype.directCodegen(newName)
 		LLVM.LLVMGetNamedFunction(module, prototype.name)
 		val sub = subContext(function)
 		insertAt(sub.basicBlock("entry"))
@@ -27,5 +29,20 @@ internal class FunctionNode(
 		return function
 	}
 
+	override fun Context.codegenForThis(): Value =
+		directCodegen()
+
 	override fun toString(): String = "$prototype $body"
+}
+
+internal class GenericFunctionNode(
+	val node: FunctionNode,
+	val typeParameters: List<TypeParameter>
+) : ASTNode {
+	override fun Context.codegenForThis(): Value {
+		declareFunction(node.prototype, Function.Generic(node, typeParameters))
+		return Value.Unit
+	}
+
+	override fun toString(): String = "${GenericPrototypeNode(node.prototype, typeParameters)} ${node.body}"
 }

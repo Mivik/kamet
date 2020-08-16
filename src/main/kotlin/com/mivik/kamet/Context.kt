@@ -1,6 +1,7 @@
 package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
+import com.mivik.kamet.ast.AbstractFunctionNode
 import com.mivik.kamet.ast.PrototypeNode
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
@@ -23,7 +24,8 @@ class Context(
 	private val valueMap: PersistentMap<String, Value>,
 	private val internalMap: PersistentMap<String, Any>,
 	private val typeMap: PersistentMap<String, Type>,
-	private val functionMap: PersistentListMap<String, Function>
+	private val functionMap: PersistentListMap<String, Function>,
+	private val genericFunctionMap: PersistentMap<String, Function.Generic>
 ) : Disposable {
 	companion object {
 		fun topLevel(moduleName: String): Context =
@@ -35,7 +37,8 @@ class Context(
 				PersistentMap(),
 				PersistentMap(),
 				Type.defaultTypeMap.subMap(),
-				PersistentListMap()
+				PersistentListMap(),
+				PersistentMap()
 			)
 	}
 
@@ -48,6 +51,9 @@ class Context(
 	fun lookupInternal(name: String) = internalMap[name] ?: error("Unknown internal identifier ${name.escape()}")
 	fun lookupTypeOrNull(name: String) = typeMap[name]
 	fun lookupType(name: String) = typeMap[name] ?: error("Unknown type ${name.escape()}")
+	fun lookupGenericFunctionOrNull(name: String) = genericFunctionMap[name]
+	fun lookupGenericFunction(name: String) =
+		genericFunctionMap[name] ?: error("Unknown generic function ${name.escape()}")
 
 	fun hasValue(name: String): Boolean = valueMap.containsKey(name)
 	fun lookupFunctions(name: String, receiverType: Type? = null): Iterable<Function> = functionMap[name]
@@ -80,7 +86,8 @@ class Context(
 			valueMap.subMap(),
 			internalMap.subMap(),
 			typeMap.subMap(),
-			functionMap.subMap()
+			functionMap.subMap(),
+			genericFunctionMap.subMap()
 		)
 
 	inline fun insertAt(block: LLVMBasicBlockRef) {
@@ -106,11 +113,16 @@ class Context(
 	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
 	internal inline fun Type.sizeOf() = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
-	internal fun Type.resolve(): Type =
+	internal inline fun AbstractFunctionNode.directCodegen(newName: String? = null) = directCodegenForThis(newName)
+	internal inline fun Function.resolve() = resolveForThis()
+
+	@Suppress("IfThenToElvis")
+	internal tailrec fun Type.resolve(): Type =
 		if (resolved) this
-		else resolveForThis().let {
-			if (it == this) this
-			else it.resolve()
+		else {
+			val ret = resolveForThis()
+			if (ret == this) this
+			else ret.resolve()
 		}
 
 	internal inline fun Function.invoke(receiver: Value?, arguments: List<Value>) = invokeForThis(receiver, arguments)
@@ -153,6 +165,11 @@ class Context(
 
 	internal fun declareFunction(prototype: PrototypeNode, value: Function) {
 		require(value.resolved) { "Declaring an unresolved function" }
+		if (value is Function.Generic) {
+			if (genericFunctionMap.containsKey(prototype.name)) error("Generic function redeclared: ${prototype.name}")
+			genericFunctionMap[prototype.name] = value
+			return
+		}
 		val parameterTypes = value.type.parameterTypes
 		findDuplicate@ for (function in lookupFunctions(prototype.name)) {
 			val type = function.type
@@ -181,7 +198,7 @@ class Context(
 		block: Context.() -> R
 	): R {
 		val genericName = actualGenericName(name, typeArguments)
-		internalMap[name]?.let { return it as R }
+		internalMap[genericName]?.let { return it as R }
 		return with(genericContext(typeParameters, typeArguments), block)
 			.also { declareInternal(genericName, it) }
 	}

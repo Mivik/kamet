@@ -143,7 +143,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 					}
 					is CallNode -> {
 						// lhs is actually the receiver
-						CallNode(rhs.function, lv.direct(), rhs.elements, rhs.typeArguments).codegen()
+						CallNode(rhs.function, lv.direct(), rhs.elements).codegen()
 					}
 					else -> error("Unexpected $rhs")
 				}

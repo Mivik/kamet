@@ -5,7 +5,7 @@ import org.bytedeco.llvm.global.LLVM
 
 open class ValueRef(address: LLVMValueRef, val originalType: Type, val isConst: Boolean) :
 	Value(address, originalType.reference(isConst)) {
-	open fun Context.setValueForThis(value: Value) {
+	internal open fun Context.setValueForThis(value: Value) {
 		LLVM.LLVMBuildStore(builder, value.llvm, llvm)
 	}
 

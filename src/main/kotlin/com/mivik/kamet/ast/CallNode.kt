@@ -2,28 +2,20 @@ package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
 import com.mivik.kamet.Function
-import com.mivik.kamet.Type
 import com.mivik.kamet.Value
-import com.mivik.kamet.actualGenericName
 import com.mivik.kamet.ifNotNull
 
 internal class CallNode(
-	val function: Function.Named,
+	val function: Function,
 	val receiver: ASTNode?,
-	val elements: List<ASTNode>,
-	val typeArguments: List<Type>
+	val elements: List<ASTNode>
 ) : ASTNode {
 	override fun Context.codegenForThis(): Value {
 		val receiver = receiver?.codegen()
 		val arguments = elements.map { it.codegen() }
-		return function.invoke(receiver, arguments)
+		return function.resolve().invoke(receiver, arguments)
 	}
 
 	override fun toString(): String =
-		"${receiver.ifNotNull { "$receiver." }}${
-			actualGenericName(
-				function.name,
-				typeArguments
-			)
-		}(${elements.joinToString()})"
+		"${receiver.ifNotNull { "$receiver." }}$function(${elements.joinToString()})"
 }

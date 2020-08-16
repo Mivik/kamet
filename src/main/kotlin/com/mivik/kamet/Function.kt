@@ -1,5 +1,6 @@
 package com.mivik.kamet
 
+import com.mivik.kamet.ast.AbstractFunctionNode
 import org.bytedeco.llvm.global.LLVM
 
 private fun Context.invokeFunction(function: Value, receiver: Value?, arguments: List<Value>): Value {
@@ -46,6 +47,8 @@ sealed class Function : Resolvable {
 				receiver?.type,
 				arguments.map { it.type }
 			).invoke(receiver, arguments)
+
+		override fun toString(): String = name
 	}
 
 	class Static(val function: Value) : Function() {
@@ -54,5 +57,43 @@ sealed class Function : Resolvable {
 
 		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>): Value =
 			invokeFunction(function, receiver, arguments)
+	}
+
+	// TODO transform the function body
+	class Generic internal constructor(
+		internal val node: AbstractFunctionNode,
+		val typeParameters: List<TypeParameter>
+	) : Function() {
+		override val type: Type.Function
+			get() = node.prototype.type
+
+		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>): Value =
+			error("Invoking an unresolved generic function")
+
+		override fun toString(): String = genericName(node.prototype.name, typeParameters)
+	}
+
+	class ActualGeneric(
+		val name: String,
+		val typeArguments: List<Type>
+	) : Function() {
+		override val type: Type.Function
+			get() = error("Unresolved")
+		override val resolved: Boolean
+			get() = false
+
+		override fun Context.resolveForThis(): Function {
+			val generic = lookupGenericFunction(name)
+			val node = generic.node
+			return buildGeneric(node.prototype.name, generic.typeParameters, typeArguments) {
+				// TODO not always static
+				Static(node.directCodegen(genericName(node.prototype.name, generic.typeParameters)))
+			}
+		}
+
+		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>): Value =
+			error("Invoking an unresolved function")
+
+		override fun toString(): String = actualGenericName(name, typeArguments)
 	}
 }
