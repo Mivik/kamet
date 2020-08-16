@@ -158,7 +158,7 @@ internal class Parser(private val lexer: Lexer) {
 			is Token.Identifier ->
 				when (peek()) {
 					Token.LeftParenthesis, BinOp.Less ->
-						CallNode(null, token.name, takeArguments(), takeTypeArguments())
+						CallNode(Function.Named(token.name), null, takeArguments(), takeTypeArguments())
 					else -> ValueNode(token.name)
 				}
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
@@ -444,7 +444,7 @@ internal class Parser(private val lexer: Lexer) {
 			when (trimAndPeek()) {
 				Token.Function -> list += takeFunctionOrPrototype().also {
 					if (it is PrototypeNode)
-						require(it.extern) { "Function without implementation is not allowed." }
+						require(it.extern) { "Function without implementation is not allowed" }
 				}
 				Token.Struct -> list += takeStruct()
 				Token.NumberSign -> takeAttributes()

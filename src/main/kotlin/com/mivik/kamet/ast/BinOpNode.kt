@@ -143,7 +143,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 					}
 					is CallNode -> {
 						// lhs is actually the receiver
-						CallNode(lv.direct(), rhs.name, rhs.elements, rhs.typeArguments).codegen()
+						CallNode(rhs.function, lv.direct(), rhs.elements, rhs.typeArguments).codegen()
 					}
 					else -> error("Unexpected $rhs")
 				}
@@ -154,7 +154,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 
 	@Suppress("NOTHING_TO_INLINE")
 	private inline fun checkPointerOperation(op: BinOp) =
-		require(op == BinOp.Plus || op == BinOp.Minus) { "$op is not allowed between pointers and integral." }
+		require(op == BinOp.Plus || op == BinOp.Minus) { "$op is not allowed between pointers and integral" }
 
 	@Suppress("NOTHING_TO_INLINE")
 	private inline fun Context.pointerArithmeticCodegen(lhs: Value, rhs: Value, op: BinOp): Value {
@@ -162,7 +162,7 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 		val rhsPointer = rhs.type.asPointerOrNull()
 		return when {
 			lhsPointer != null && rhsPointer != null -> {
-				require(op == BinOp.Minus) { "$op is not allowed between two pointers." }
+				require(op == BinOp.Minus) { "$op is not allowed between two pointers" }
 				require(lhsPointer.elementType == rhsPointer.elementType) { "Subtraction between two incompatible pointer types: ${lhs.type} and ${rhs.type}" }
 				arithmeticCodegen(
 					arithmeticCodegen(lhs.pointerToInt(), rhs.pointerToInt(), BinOp.Minus),

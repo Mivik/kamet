@@ -64,6 +64,7 @@ class Context(
 
 	fun declareType(name: String, type: Type) {
 		if (typeMap.containsKey(name)) error("Redeclaration of type ${name.escape()}")
+		require(type.resolved) { "Declaring an unresolved type: $type" }
 		typeMap[name] = type
 	}
 
@@ -118,20 +119,17 @@ class Context(
 
 	internal fun Function.match(
 		receiverType: Type?,
-		argumentTypes: List<Type>,
-		typeArguments: List<Type>
+		argumentTypes: List<Type>
 	): Boolean {
 		val type = type
 		val parameterTypes = type.parameterTypes
 		if (parameterTypes.size != argumentTypes.size) return false
-		if (typeParameters.size != typeArguments.size) return false
 		if (receiverType == null) {
 			if (type.receiverType != null) return false
 		} else {
 			if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return false
 		}
-		return typeParameters.indices.all { typeParameters[it].check(typeArguments[it]) } &&
-				parameterTypes.indices.all { argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }
+		return parameterTypes.indices.all { argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }
 	}
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
@@ -154,6 +152,7 @@ class Context(
 	}
 
 	internal fun declareFunction(prototype: PrototypeNode, value: Function) {
+		require(value.resolved) { "Declaring an unresolved function" }
 		val parameterTypes = value.type.parameterTypes
 		findDuplicate@ for (function in lookupFunctions(prototype.name)) {
 			val type = function.type
@@ -170,7 +169,7 @@ class Context(
 		val sub = subContext(topLevel = true)
 		typeParameters.forEachIndexed { index, para ->
 			if (!para.check(typeArguments[index])) error("${typeArguments[index]} does not satisfy $para")
-			sub.declareType(para.name, typeArguments[index])
+			sub.declareType(para.name, typeArguments[index].resolve())
 		}
 		return sub
 	}

@@ -27,7 +27,7 @@ private fun Context.invokeFunction(function: Value, receiver: Value?, arguments:
 
 sealed class Function : Resolvable {
 	abstract val type: Type.Function
-	abstract val typeParameters: List<TypeParameter>
+
 	abstract fun Context.invokeForThis(
 		receiver: Value?,
 		arguments: List<Value>
@@ -35,12 +35,22 @@ sealed class Function : Resolvable {
 
 	override fun Context.resolveForThis(): Function = this@Function
 
+	class Named(val name: String) : Function() {
+		override val type: Type.Function
+			get() = error("Undetermined")
+
+		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>): Value =
+			findMatchingFunction(
+				name,
+				lookupFunctions(name, receiver?.type),
+				receiver?.type,
+				arguments.map { it.type }
+			).invoke(receiver, arguments)
+	}
+
 	class Static(val function: Value) : Function() {
 		override val type: Type.Function
 			get() = function.type as Type.Function
-
-		override val typeParameters: List<TypeParameter>
-			get() = emptyList()
 
 		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>): Value =
 			invokeFunction(function, receiver, arguments)

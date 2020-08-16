@@ -90,13 +90,12 @@ internal fun Context.findMatchingFunction(
 	name: String,
 	alternatives: Iterable<Function>,
 	receiverType: Type?,
-	argumentTypes: List<Type>,
-	typeArguments: List<Type>
+	argumentTypes: List<Type>
 ): Function {
 	val functions = alternatives.iterator().takeIf { it.hasNext() } ?: error("No function named ${name.escape()}")
 	var found: Function? = null
 	for (function in functions) {
-		if (!function.match(receiverType, argumentTypes, typeArguments)) continue
+		if (!function.match(receiverType, argumentTypes)) continue
 		if (found == null) found = function
 		else error("Ambiguous call to function ${name.escape()}: ${function.type} and ${found.type} are both applicable to arguments (${argumentTypes.joinToString()})")
 	}

@@ -36,7 +36,6 @@ sealed class Type : Resolvable {
 	}
 
 	abstract val name: String
-	override fun toString(): String = name
 	open fun dereference(): Type = this
 	abstract val llvm: LLVMTypeRef
 	override fun Context.resolveForThis(): Type = this@Type
@@ -70,6 +69,8 @@ sealed class Type : Resolvable {
 			get() = false
 
 		override fun Context.resolveForThis() = lookupTypeOrNull(name) ?: this@Named
+
+		override fun toString(): String = name
 	}
 
 	data class Array(
@@ -84,6 +85,8 @@ sealed class Type : Resolvable {
 			Array(elementType.resolve(), size, isConst)
 
 		override val llvm: LLVMTypeRef by lazy { LLVM.LLVMArrayType(elementType.llvm, size) }
+
+		override fun toString(): String = name
 	}
 
 	data class Function(val receiverType: Type?, val returnType: Type, val parameterTypes: List<Type>) : Composed() {
@@ -112,6 +115,8 @@ sealed class Type : Resolvable {
 				0
 			)
 		}
+
+		override fun toString(): String = name
 	}
 
 	data class Struct(override val name: String, val elements: List<Pair<String, Type>>, private val packed: Boolean) :
@@ -138,6 +143,8 @@ sealed class Type : Resolvable {
 
 		@Suppress("NOTHING_TO_INLINE")
 		inline fun memberType(index: Int) = elements[index].second
+
+		override fun toString(): String = name
 	}
 
 	sealed class Primitive(override val name: String, val sizeInBits: Int, override val llvm: LLVMTypeRef) : Type() {
@@ -182,6 +189,8 @@ sealed class Type : Resolvable {
 			else null
 
 		override fun dereference(): Type = originalType
+
+		override fun toString(): String = name
 	}
 
 	data class Pointer(val elementType: Type, val isConst: Boolean) : Type() {
@@ -199,11 +208,12 @@ sealed class Type : Resolvable {
 		override val llvm: LLVMTypeRef by lazy { elementType.llvm.pointer() }
 
 		override fun asPointerOrNull(): Pointer? = this
+
+		override fun toString(): String = name
 	}
 
 	data class Generic(val baseType: Type, val typeParameters: List<TypeParameter>) : Abstract() {
-		override val name = baseType.name
-		override val resolved = baseType.resolved
+		override val name = genericName(baseType.name, typeParameters)
 
 		override fun Context.resolveForThis() = Generic(baseType.resolve(), typeParameters)
 
@@ -211,6 +221,8 @@ sealed class Type : Resolvable {
 			buildGeneric(baseType.name, typeParameters, typeArguments) {
 				baseType.resolve()
 			}
+
+		override fun toString(): String = name
 	}
 
 	data class ActualGeneric(val genericType: Type, val typeArguments: List<Type>) : Abstract() {
@@ -220,6 +232,8 @@ sealed class Type : Resolvable {
 
 		override fun Context.resolveForThis(): Type =
 			genericType.resolve().expect<Generic>().resolveGeneric(typeArguments)
+
+		override fun toString(): String = name
 	}
 }
 

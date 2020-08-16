@@ -15,7 +15,7 @@ private fun Context.convert(value: Value, expected: Type? = null): Value {
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun unclearVariable(name: String): Nothing =
-	error("Declaration of variable ${name.escape()} without type or initializer.")
+	error("Declaration of variable ${name.escape()} without type or initializer")
 
 internal class ValDeclareNode(
 	val name: String,
