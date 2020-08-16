@@ -335,27 +335,4 @@ internal class KametTest {
 			""".trimIndent().runFunction("test").int
 		)
 	}
-
-	@Test
-	fun `generic function`() {
-		assertEquals(
-			4,
-			"""
-				fun <T> max(a: T, b: T): T { return if (a>b) a else b }
-				
-				#[no_mangle] fun test(): Int {
-					return max<Int>(max<Int>(1, 3), max<Int>(2, 4))
-				}
-			""".trimIndent().runFunction("test").int
-		)
-		assertTrue(
-			"""
-				fun <T> T.lessThan(other: T): Boolean { return this<other }
-				
-				#[no_mangle] fun test(): Boolean {
-					return 1.lessThan<Int>(2) && (2.3).lessThan<Double>(4.5)
-				}
-			""".trimIndent().runFunction("test").boolean
-		)
-	}
 }

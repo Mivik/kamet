@@ -1,5 +1,5 @@
 package com.mivik.kamet
 
 open class TypeParameter(val name: String) {
-	open fun check(type: Type) = true
+	open fun Context.checkForThis(type: Type) = true
 }

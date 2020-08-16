@@ -4,11 +4,8 @@ import com.mivik.kamet.Attribute
 import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
 import com.mivik.kamet.Function
-import com.mivik.kamet.Generic
 import com.mivik.kamet.Type
-import com.mivik.kamet.TypeParameter
 import com.mivik.kamet.Value
-import com.mivik.kamet.genericName
 import com.mivik.kamet.ifNotNull
 import com.mivik.kamet.ifThat
 import com.mivik.kamet.toInt
@@ -68,20 +65,4 @@ internal class PrototypeNode(
 
 	override fun toString(): String =
 		"${attributes}fun ${type.receiverType.ifNotNull { "${type.receiverType}." }}$name(${parameterNames.indices.joinToString { "${parameterNames[it]}: ${type.parameterTypes[it]}" }}): ${type.returnType}"
-}
-
-internal class GenericPrototypeNode(
-	val attributes: Attributes,
-	val name: String,
-	val type: Type.Function,
-	val parameterNames: List<String>,
-	val typeParameters: List<TypeParameter>
-) : ASTNode {
-	override fun Context.codegenForThis(): Value {
-		declareGeneric(name, object : Generic(name, typeParameters) {
-			override fun Context.instantiate(arguments: List<Type>): Any =
-				Function.Static(PrototypeNode(attributes, genericName(name, arguments), type, parameterNames).codegen())
-		})
-		return Value.Unit
-	}
 }

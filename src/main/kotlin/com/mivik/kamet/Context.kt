@@ -23,8 +23,7 @@ class Context(
 	private val valueMap: PersistentMap<String, Value>,
 	private val internalMap: PersistentMap<String, Any>,
 	private val typeMap: PersistentMap<String, Type>,
-	private val functionMap: PersistentMap<String, MutableList<Function>>,
-	private val genericMap: PersistentMap<String, Generic>,
+	private val functionMap: PersistentListMap<String, Function>
 ) : Disposable {
 	companion object {
 		fun topLevel(moduleName: String): Context =
@@ -36,8 +35,7 @@ class Context(
 				PersistentMap(),
 				PersistentMap(),
 				Type.defaultTypeMap.subMap(),
-				PersistentMap(),
-				PersistentMap()
+				PersistentListMap()
 			)
 	}
 
@@ -50,10 +48,17 @@ class Context(
 	fun lookupInternal(name: String) = internalMap[name] ?: error("Unknown internal identifier ${name.escape()}")
 	fun lookupTypeOrNull(name: String) = typeMap[name]
 	fun lookupType(name: String) = typeMap[name] ?: error("Unknown type ${name.escape()}")
-	fun lookupGenericOrNull(name: String) = genericMap[name]
+
 	fun hasValue(name: String): Boolean = valueMap.containsKey(name)
-	fun lookupFunctions(name: String, receiverType: Type? = null) = functionMap[name] ?: emptyList()
-	fun lookupGeneric(name: String) = genericMap[name] ?: error("Unknown generic type ${name.escape()}")
+	fun lookupFunctions(name: String, receiverType: Type? = null): Iterable<Function> = functionMap[name]
+
+	fun declare(name: String, value: Value) {
+		valueMap[name] = value
+	}
+
+	fun declareInternal(name: String, value: Any) {
+		internalMap[name] = value
+	}
 
 	inline fun declareType(type: Type) = declareType(type.name, type)
 
@@ -62,30 +67,19 @@ class Context(
 		typeMap[name] = type
 	}
 
-	fun declareGeneric(name: String, generic: Generic) {
-		if (genericMap.containsKey(name)) error("Redeclaration of generic type ${name.escape()}")
-		genericMap[name] = generic
-	}
-
-	fun declareInternal(name: String, value: Any) {
-		internalMap[name] = value
-	}
-
-	fun declare(name: String, value: Value) {
-		valueMap[name] = value
-	}
-
-	fun subContext(currentFunction: Value? = this.currentFunction, topLevel: Boolean = false): Context =
+	fun subContext(
+		function: Value? = currentFunction,
+		topLevel: Boolean = false
+	): Context =
 		Context(
 			this,
 			module,
 			if (topLevel) LLVM.LLVMCreateBuilder() else builder,
-			currentFunction,
+			function,
 			valueMap.subMap(),
 			internalMap.subMap(),
 			typeMap.subMap(),
-			functionMap.subMap(),
-			genericMap.subMap()
+			functionMap.subMap()
 		)
 
 	inline fun insertAt(block: LLVMBasicBlockRef) {
@@ -111,9 +105,34 @@ class Context(
 	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
 	internal inline fun Type.sizeOf() = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
-	internal inline fun Type.resolve() = resolveForThis()
+	internal fun Type.resolve(): Type =
+		if (resolved) this
+		else resolveForThis().let {
+			if (it == this) this
+			else it.resolve()
+		}
+
 	internal inline fun Function.invoke(receiver: Value?, arguments: List<Value>) = invokeForThis(receiver, arguments)
-	internal inline fun Generic.resolve(arguments: List<Type>) = resolveForThis(arguments)
+	internal inline fun TypeParameter.check(type: Type) = checkForThis(type)
+	internal inline fun Type.Generic.resolveGeneric(typeArguments: List<Type>) = resolveGenericForThis(typeArguments)
+
+	internal fun Function.match(
+		receiverType: Type?,
+		argumentTypes: List<Type>,
+		typeArguments: List<Type>
+	): Boolean {
+		val type = type
+		val parameterTypes = type.parameterTypes
+		if (parameterTypes.size != argumentTypes.size) return false
+		if (typeParameters.size != typeArguments.size) return false
+		if (receiverType == null) {
+			if (type.receiverType != null) return false
+		} else {
+			if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return false
+		}
+		return typeParameters.indices.all { typeParameters[it].check(typeArguments[it]) } &&
+				parameterTypes.indices.all { argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }
+	}
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
 		val function = LLVM.LLVMGetBasicBlockParent(LLVM.LLVMGetInsertBlock(builder))
@@ -143,7 +162,29 @@ class Context(
 				if (parameterTypes[i] != type.parameterTypes[i]) continue@findDuplicate
 			error("Function ${prototype.name} redeclared with same parameter types: (${parameterTypes.joinToString()})")
 		}
-		functionMap.getOrPut(prototype.name) { mutableListOf() } += value
+		functionMap.add(prototype.name, value)
+	}
+
+	internal fun genericContext(typeParameters: List<TypeParameter>, typeArguments: List<Type>): Context {
+		require(typeParameters.size == typeArguments.size) { "Expected ${typeParameters.size} type arguments, got ${typeArguments.size}: [${typeArguments.joinToString()}]" }
+		val sub = subContext(topLevel = true)
+		typeParameters.forEachIndexed { index, para ->
+			if (!para.check(typeArguments[index])) error("${typeArguments[index]} does not satisfy $para")
+			sub.declareType(para.name, typeArguments[index])
+		}
+		return sub
+	}
+
+	internal inline fun <reified R : Any> buildGeneric(
+		name: String,
+		typeParameters: List<TypeParameter>,
+		typeArguments: List<Type>,
+		block: Context.() -> R
+	): R {
+		val genericName = actualGenericName(name, typeArguments)
+		internalMap[name]?.let { return it as R }
+		return with(genericContext(typeParameters, typeArguments), block)
+			.also { declareInternal(genericName, it) }
 	}
 
 	fun runDefaultPass(): Context = apply {

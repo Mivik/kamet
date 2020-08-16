@@ -3,9 +3,8 @@ package com.mivik.kamet
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
-import org.kiot.util.contentEquals
 
-sealed class Type(val name: String) {
+sealed class Type : Resolvable {
 	companion object {
 		private val defaultTypes by lazy {
 			arrayOf(
@@ -36,12 +35,11 @@ sealed class Type(val name: String) {
 		val pointerAddressType = Primitive.Integral.ULong
 	}
 
+	abstract val name: String
 	override fun toString(): String = name
-
 	open fun dereference(): Type = this
-
-	abstract fun Context.resolveForThis(): Type
 	abstract val llvm: LLVMTypeRef
+	override fun Context.resolveForThis(): Type = this@Type
 
 	fun undefined(): Value = new(LLVM.LLVMGetUndef(llvm))
 	open fun new(llvm: LLVMValueRef): Value = Value(llvm, this)
@@ -49,51 +47,54 @@ sealed class Type(val name: String) {
 	open fun asPointerOrNull(): Pointer? = null
 	inline val isPointer get() = asPointerOrNull() != null
 
-	abstract class Composed(name: String) : Type(name)
-	abstract class Unresolved(name: String) : Type(name) {
+	abstract class Composed : Type()
+	abstract class Abstract : Type() {
 		override val llvm: LLVMTypeRef
 			get() = error("Getting the real type of an unresolved type: ${name.escape()}")
 	}
 
-	object Nothing : Type("Nothing") {
-		override fun Context.resolveForThis(): Type = this@Nothing
+	object Nothing : Type() {
+		override val name: String
+			get() = "Nothing"
 		override val llvm: LLVMTypeRef = LLVM.LLVMVoidType()
 	}
 
-	object Unit : Type("Unit") {
-		override fun Context.resolveForThis(): Type = this@Unit
+	object Unit : Type() {
+		override val name: String
+			get() = "Unit"
 		override val llvm: LLVMTypeRef = LLVM.LLVMVoidType()
 	}
 
-	class Named(name: String) : Unresolved(name) {
-		override fun Context.resolveForThis(): Type = lookupType(name)
+	data class Named(override val name: String) : Abstract() {
+		override val resolved: Boolean
+			get() = false
+
+		override fun Context.resolveForThis() = lookupTypeOrNull(name) ?: this@Named
 	}
 
-	class Array(
+	data class Array(
 		val elementType: Type,
 		val size: Int,
 		val isConst: Boolean
-	) : Type("[${isConst.ifThat { "const " }}$elementType, $size]") {
-		override fun Context.resolveForThis(): Type = Array(elementType.resolve(), size, isConst)
+	) : Type() {
+		override val name = "[${isConst.ifThat { "const " }}$elementType, $size]"
+		override val resolved = elementType.resolved
+
+		override fun Context.resolveForThis() =
+			Array(elementType.resolve(), size, isConst)
 
 		override val llvm: LLVMTypeRef by lazy { LLVM.LLVMArrayType(elementType.llvm, size) }
-
-		override fun equals(other: Any?): Boolean =
-			if (other is Array) elementType == other.elementType && size == other.size
-			else false
-
-		override fun hashCode(): Int {
-			var result = elementType.hashCode()
-			result = 31 * result + size
-			return result
-		}
 	}
 
-	class Function(val receiverType: Type?, val returnType: Type, val parameterTypes: List<Type>) :
-		Composed("${receiverType.ifNotNull { "$receiverType." }}(${parameterTypes.joinToString()}):$returnType") {
+	data class Function(val receiverType: Type?, val returnType: Type, val parameterTypes: List<Type>) : Composed() {
+		override val name =
+			"${receiverType.ifNotNull { "$receiverType." }}(${parameterTypes.joinToString()}):$returnType"
+		override val resolved =
+			(receiverType == null || receiverType.resolved) && returnType.resolved && parameterTypes.all { it.resolved }
+
 		inline val hasReceiver get() = receiverType != null
 
-		override fun Context.resolveForThis(): Type =
+		override fun Context.resolveForThis() =
 			Function(receiverType?.resolve(), returnType.resolve(), parameterTypes.map { it.resolve() })
 
 		override val llvm: LLVMTypeRef by lazy {
@@ -111,24 +112,13 @@ sealed class Type(val name: String) {
 				0
 			)
 		}
-
-		override fun equals(other: Any?): Boolean =
-			if (other is Function)
-				receiverType == other.receiverType &&
-						returnType == other.returnType &&
-						parameterTypes.contentEquals(other.parameterTypes)
-			else false
-
-		override fun hashCode(): Int {
-			var result = receiverType.hashCode()
-			result = 31 * result + returnType.hashCode()
-			result = 31 * result + parameterTypes.hashCode()
-			return result
-		}
 	}
 
-	class Struct(name: String, val elements: List<Pair<String, Type>>, private val packed: Boolean) : Composed(name) {
-		override fun Context.resolveForThis(): Type =
+	data class Struct(override val name: String, val elements: List<Pair<String, Type>>, private val packed: Boolean) :
+		Composed() {
+		override val resolved = elements.all { it.second.resolved }
+
+		override fun Context.resolveForThis() =
 			Struct(name, elements.map { Pair(it.first, it.second.resolve()) }, packed)
 
 		override val llvm: LLVMTypeRef by lazy {
@@ -150,8 +140,9 @@ sealed class Type(val name: String) {
 		inline fun memberType(index: Int) = elements[index].second
 	}
 
-	sealed class Primitive(name: String, val sizeInBits: Int, override val llvm: LLVMTypeRef) : Type(name) {
-		override fun Context.resolveForThis(): Type = this@Primitive
+	sealed class Primitive(override val name: String, val sizeInBits: Int, override val llvm: LLVMTypeRef) : Type() {
+		override val resolved: kotlin.Boolean
+			get() = true
 
 		object Boolean : Primitive("Boolean", 1, LLVM.LLVMIntType(1))
 
@@ -175,11 +166,14 @@ sealed class Type(val name: String) {
 		}
 	}
 
-	class Reference(val originalType: Type, val isConst: Boolean) :
-		Type("&${isConst.ifThat { "const " }}($originalType)") {
+	data class Reference(val originalType: Type, val isConst: Boolean) : Type() {
+		override val name = "&${isConst.ifThat { "const " }}($originalType)"
+		override val resolved = originalType.resolved
+
 		override fun new(llvm: LLVMValueRef): Value = ValueRef(llvm, originalType, isConst)
 
-		override fun Context.resolveForThis(): Type = Reference(originalType.resolve(), isConst)
+		override fun Context.resolveForThis() =
+			Reference(originalType.resolve(), isConst)
 
 		override val llvm: LLVMTypeRef by lazy { originalType.llvm.pointer() }
 
@@ -188,39 +182,44 @@ sealed class Type(val name: String) {
 			else null
 
 		override fun dereference(): Type = originalType
-
-		override fun equals(other: Any?): Boolean =
-			if (other is Reference)
-				isConst == other.isConst && originalType == other.originalType
-			else false
-
-		override fun hashCode(): Int = originalType.hashCode()
 	}
 
-	class Pointer(val elementType: Type, val isConst: Boolean) :
-		Type("*${isConst.ifThat { "const " }}($elementType)") {
+	data class Pointer(val elementType: Type, val isConst: Boolean) : Type() {
+		override val name = "*${isConst.ifThat { "const " }}($elementType)"
+
 		init {
 			require(elementType !is Reference) { "Creating a pointer to a reference" }
 		}
 
-		override fun Context.resolveForThis(): Type = Pointer(elementType.resolve(), isConst)
+		override val resolved = elementType.resolved
+
+		override fun Context.resolveForThis() =
+			Pointer(elementType.resolve(), isConst)
 
 		override val llvm: LLVMTypeRef by lazy { elementType.llvm.pointer() }
 
 		override fun asPointerOrNull(): Pointer? = this
-
-		override fun equals(other: Any?): Boolean =
-			if (other is Pointer)
-				isConst == other.isConst && elementType == other.elementType
-			else false
-
-		override fun hashCode(): Int = elementType.hashCode()
 	}
 
-	class Generic(val genericName: String, val arguments: List<Type>) :
-		Unresolved(genericName(genericName, arguments)) {
+	data class Generic(val baseType: Type, val typeParameters: List<TypeParameter>) : Abstract() {
+		override val name = baseType.name
+		override val resolved = baseType.resolved
+
+		override fun Context.resolveForThis() = Generic(baseType.resolve(), typeParameters)
+
+		fun Context.resolveGenericForThis(typeArguments: List<Type>): Type =
+			buildGeneric(baseType.name, typeParameters, typeArguments) {
+				baseType.resolve()
+			}
+	}
+
+	data class ActualGeneric(val genericType: Type, val typeArguments: List<Type>) : Abstract() {
+		override val name = actualGenericName(genericType.name, typeArguments)
+		override val resolved: Boolean
+			get() = false
+
 		override fun Context.resolveForThis(): Type =
-			lookupGeneric(genericName).resolve(arguments.map { it.resolve() }) as Type
+			genericType.resolve().expect<Generic>().resolveGeneric(typeArguments)
 	}
 }
 

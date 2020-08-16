@@ -76,44 +76,41 @@ internal fun <T> Set<T>.readOnly() =
 		else -> this
 	}
 
-internal fun genericName(baseName: String, typeParameters: List<Type>) =
+internal fun genericName(baseName: String, typeParameters: List<TypeParameter>) =
 	"$baseName<${typeParameters.joinToString()}>"
 
-internal fun Function.match(receiverType: Type?, argumentTypes: List<Type>): Boolean {
-	val type = type
-	val parameterTypes = type.parameterTypes
-	if (argumentTypes.size != parameterTypes.size) return false
-	if (receiverType == null) {
-		if (type.receiverType != null) return false
-	} else {
-		if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return false
-	}
-	return argumentTypes.indices.all { argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }
-}
+internal fun actualGenericName(baseName: String, typeArguments: List<Type>) =
+	if (typeArguments.isEmpty()) baseName
+	else "$baseName<${typeArguments.joinToString()}>"
 
 internal fun noMatchingFunction(name: String, argumentTypes: List<Type>): Nothing =
 	error("No matching function for call to ${name.escape()} with argument types: (${argumentTypes.joinToString()})")
 
-internal fun findMatchingFunction(
+internal fun Context.findMatchingFunction(
 	name: String,
 	alternatives: Iterable<Function>,
 	receiverType: Type?,
-	argumentTypes: List<Type>
+	argumentTypes: List<Type>,
+	typeArguments: List<Type>
 ): Function {
 	val functions = alternatives.iterator().takeIf { it.hasNext() } ?: error("No function named ${name.escape()}")
 	var found: Function? = null
 	for (function in functions) {
-		if (!function.match(receiverType, argumentTypes)) continue
+		if (!function.match(receiverType, argumentTypes, typeArguments)) continue
 		if (found == null) found = function
 		else error("Ambiguous call to function ${name.escape()}: ${function.type} and ${found.type} are both applicable to arguments (${argumentTypes.joinToString()})")
 	}
 	return found ?: noMatchingFunction(name, argumentTypes)
 }
 
-internal fun <T : Pointer> List<T>.toPointerPointer() =
-	buildPointerPointer(size) { this[it] }
-
 internal inline fun <T : Pointer> buildPointerPointer(size: Int, generator: (Int) -> T): PointerPointer<T> =
 	PointerPointer<T>(size.toLong()).apply {
 		for (i in 0 until size) put(i.toLong(), generator(i))
 	}
+
+internal fun <T : Pointer> buildPointerPointer(vararg pointers: T) =
+	buildPointerPointer(pointers.size) { pointers[it] }
+
+internal fun List<Type>.unexpected() {
+	if (isNotEmpty()) error("Unexpected type arguments: <${joinToString()}>")
+}

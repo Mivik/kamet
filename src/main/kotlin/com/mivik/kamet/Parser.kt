@@ -8,9 +8,6 @@ import com.mivik.kamet.ast.CastNode
 import com.mivik.kamet.ast.ConstantNode
 import com.mivik.kamet.ast.DoWhileNode
 import com.mivik.kamet.ast.FunctionNode
-import com.mivik.kamet.ast.GenericCallNode
-import com.mivik.kamet.ast.GenericFunctionNode
-import com.mivik.kamet.ast.GenericPrototypeNode
 import com.mivik.kamet.ast.GenericStructNode
 import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.NewNode
@@ -156,15 +153,12 @@ internal class Parser(private val lexer: Lexer) {
 
 	private fun takePrimary(): ASTNode =
 		when (val token = trimAndTake()) {
-			is Token.Null -> Value.NullPointer.direct()
+			Token.Null -> Value.NullPointer.direct()
 			Token.This -> ValueNode("this")
 			is Token.Identifier ->
 				when (peek()) {
-					Token.LeftParenthesis -> CallNode(null, token.name, takeArguments())
-					BinOp.Less -> {
-						val args = takeTypeArguments()
-						GenericCallNode(null, token.name, takeArguments(), args)
-					}
+					Token.LeftParenthesis, BinOp.Less ->
+						CallNode(null, token.name, takeArguments(), takeTypeArguments())
 					else -> ValueNode(token.name)
 				}
 			Token.LeftParenthesis -> takeExpr().also { take().expect<Token.RightParenthesis>() }
@@ -300,7 +294,8 @@ internal class Parser(private val lexer: Lexer) {
 		}
 
 	fun takeTypeArguments(): List<Type> {
-		take().expect<BinOp.Less>()
+		if (peek() != BinOp.Less) return emptyList()
+		take()
 		val list = mutableListOf<Type>()
 		takeList(BinOp.Greater) {
 			list += takeType()
@@ -363,8 +358,10 @@ internal class Parser(private val lexer: Lexer) {
 				Type.Array(elementType, size.value.toInt(), isConst)
 			}
 			is Token.Identifier ->
-				if (peek() == BinOp.Less) Type.Generic(token.name, takeTypeArguments())
-				else Type.Named(token.name)
+				Type.Named(token.name).let {
+					if (peek() == BinOp.Less) Type.ActualGeneric(it, takeTypeArguments())
+					else it
+				}
 			else -> unexpected(token)
 		}.let {
 			if (peek() == BinOp.AccessMember) {
@@ -390,9 +387,8 @@ internal class Parser(private val lexer: Lexer) {
 		}
 	}
 
-	fun takePrototype(): ASTNode {
+	fun takePrototype(): PrototypeNode {
 		trimAndTake().expect<Token.Function>()
-		val typeParameters = takeTypeParameterList()
 		val type = takeType()
 		val hasReceiver = peek() == BinOp.AccessMember
 		val name =
@@ -414,33 +410,17 @@ internal class Parser(private val lexer: Lexer) {
 				takeType()
 			} else Type.Unit
 		val functionType = Type.Function(if (hasReceiver) type else null, returnType, types.readOnly())
-		return if (typeParameters.isEmpty()) PrototypeNode(consumeAttrs(), name, functionType, names.readOnly())
-		else GenericPrototypeNode(consumeAttrs(), name, functionType, names.readOnly(), typeParameters)
+		return PrototypeNode(consumeAttrs(), name, functionType, names.readOnly())
 	}
 
 	@Suppress("NOTHING_TO_INLINE")
 	inline fun takeFunctionOrPrototype(): ASTNode {
 		val prototype = takePrototype()
-		return if (peek() is Token.LeftBrace) {
-			if (prototype is PrototypeNode) {
-				FunctionNode(prototype, takeBlock().also {
-					if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.type.returnType))
-				})
-			} else {
-				prototype as GenericPrototypeNode
-				GenericFunctionNode(
-					PrototypeNode(
-						prototype.attributes,
-						prototype.name,
-						prototype.type,
-						prototype.parameterNames
-					), takeBlock().also {
-						if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.type.returnType))
-					},
-					prototype.typeParameters
-				)
-			}
-		} else prototype
+		return if (peek() is Token.LeftBrace)
+			FunctionNode(prototype, takeBlock().also {
+				if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.type.returnType))
+			})
+		else prototype
 	}
 
 	fun takeStruct(): ASTNode {

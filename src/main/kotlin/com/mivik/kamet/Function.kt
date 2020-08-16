@@ -25,14 +25,22 @@ private fun Context.invokeFunction(function: Value, receiver: Value?, arguments:
 	)
 }
 
-sealed class Function {
+sealed class Function : Resolvable {
 	abstract val type: Type.Function
+	abstract val typeParameters: List<TypeParameter>
+	abstract fun Context.invokeForThis(
+		receiver: Value?,
+		arguments: List<Value>
+	): Value
 
-	abstract fun Context.invokeForThis(receiver: Value?, arguments: List<Value>): Value
+	override fun Context.resolveForThis(): Function = this@Function
 
 	class Static(val function: Value) : Function() {
 		override val type: Type.Function
 			get() = function.type as Type.Function
+
+		override val typeParameters: List<TypeParameter>
+			get() = emptyList()
 
 		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>): Value =
 			invokeFunction(function, receiver, arguments)
