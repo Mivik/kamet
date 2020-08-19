@@ -38,6 +38,7 @@ internal sealed class Token {
 	object ThisType : Token()
 	object Impl : Token()
 	object Arrow : Token()
+	object For : Token()
 
 	class DirectType(val type: Type) : Token() {
 		override fun toString(): String = "Type($type)"
@@ -112,7 +113,7 @@ private enum class State : LexerState {
 }
 
 private enum class Action : LexerAction {
-	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL,
+	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL, FOR,
 	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL, NEW, DELETE, THIS_TYPE,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN, IMPL, TRAIT, THIS
 }
@@ -138,6 +139,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"return" action Action.RETURN
 				"while" action Action.WHILE
 				"const" action Action.CONST
+				"for" action Action.FOR
 				"struct" action Action.STRUCT
 				"sizeof" action Action.SIZEOF
 				"null" action Action.NULL
@@ -190,6 +192,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			Action.NULL -> returnValue(Token.Null)
 			Action.SIZEOF -> returnValue(Token.SizeOf)
 			Action.NEW -> returnValue(Token.New)
+			Action.FOR -> returnValue(Token.For)
 			Action.DELETE -> returnValue(UnaryOp.Delete)
 			Action.THIS -> returnValue(Token.This)
 			Action.THIS_TYPE -> returnValue(Token.ThisType)

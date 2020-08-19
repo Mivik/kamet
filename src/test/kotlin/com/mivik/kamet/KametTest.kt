@@ -358,4 +358,57 @@ internal class KametTest {
 			""".trimIndent().runFunction("test").boolean
 		)
 	}
+
+	@Test
+	fun `generic inference`() {
+		"""
+			fun <T> max(a: T, b: T): T { return if (a>b) a else b }
+			
+			fun test() {
+				val int = max(max(1, 3), max(2, 4))
+				val double = max(max(1.2, 3.5), max(2.4, 5.7))
+			}
+		""".trimIndent().tryCompile()
+		assertFails {
+			"""
+				fun <T> max(a: T, b: T): T { return if (a>b) a else b }
+				
+				fun test() {
+					max(max(1, 2), max(2.3, 3.5))
+				}
+			""".trimIndent().tryCompile()
+		}
+	}
+
+	@Test
+	fun trait() {
+		assertEquals(
+			9,
+			"""
+				trait Polygon {
+					fun &const This.side_count(): Int
+				}
+				
+				struct Square {}
+				struct Arbitrary {
+					count: Int
+				}
+				
+				impl Polygon for Square {
+					fun &const This.side_count(): Int { return 4 } 
+				}
+				
+				impl Polygon for Arbitrary {
+					fun &const This.side_count(): Int { return this.count }
+				}
+				
+				#[no_mangle] fun test(): Int {
+					const var square: Square
+					var arbitrary: Arbitrary
+					arbitrary.count = 5
+					return square.side_count()+arbitrary.side_count()
+				}
+			""".trimIndent().runFunction("test").int
+		)
+	}
 }

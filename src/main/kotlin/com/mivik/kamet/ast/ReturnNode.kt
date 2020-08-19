@@ -3,7 +3,6 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
 import com.mivik.kamet.Value
-import com.mivik.kamet.canImplicitlyCastTo
 import org.bytedeco.llvm.global.LLVM
 
 internal class ReturnNode(val value: ASTNode) : ASTNode {

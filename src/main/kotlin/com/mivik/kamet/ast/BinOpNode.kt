@@ -10,6 +10,7 @@ import com.mivik.kamet.ValueRef
 import com.mivik.kamet.expect
 import com.mivik.kamet.foldSign
 import com.mivik.kamet.impossible
+import com.mivik.kamet.reference
 import org.bytedeco.llvm.global.LLVM.LLVMAShr
 import org.bytedeco.llvm.global.LLVM.LLVMAdd
 import org.bytedeco.llvm.global.LLVM.LLVMAnd
@@ -133,17 +134,27 @@ internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : AS
 				when (rhs) {
 					is ValueNode -> {
 						val type = lv.type.expect<Type.Reference>()
-						val originStruct = type.originalType.expect<Type.Struct>()
+						val originStruct: Type.Struct = when (val origin = type.originalType) {
+							is Type.Struct -> origin
+							is Type.Dynamic -> origin.type.expect()
+							else -> impossible()
+						}
 						val index = originStruct.memberIndex(rhs.name)
 						ValueRef(
-							LLVMBuildStructGEP2(builder, originStruct.llvm, lv.llvm, index, "access_member"),
+							LLVMBuildStructGEP2(
+								builder,
+								originStruct.llvm,
+								lv.implicitCast(originStruct.reference(true)).llvm,
+								index,
+								"access_member"
+							),
 							originStruct.memberType(index),
 							type.isConst
 						)
 					}
 					is CallNode -> {
 						// lhs is actually the receiver
-						CallNode(rhs.function, lv.direct(), rhs.elements).codegen()
+						CallNode(rhs.function, lv.direct(), rhs.elements, rhs.typeArguments).codegen()
 					}
 					else -> error("Unexpected $rhs")
 				}

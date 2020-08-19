@@ -2,18 +2,22 @@ package com.mivik.kamet
 
 import org.bytedeco.llvm.global.LLVM
 
-typealias TPairPredicate = (Type, Type) -> Boolean
+typealias TPairPredicate = Context.(Type, Type) -> Boolean
 
 /**
  * Implicit cast (A as B) requires:
  *    (A = B)
  * or ((A = [Type.Nothing]*) and (B is [Type.Pointer]))
- * or ((A is [Type.Reference]) and canImplicitlyCast(referenced type of A, B))
+ * or ((A is &C) and canImplicitlyCast(C, B))
  * or (A = [Type.Nothing])
- * or (A.isPointer) && (B.isPointer) && (A.pointedType = B.pointedType)
+ * or (A is *pA) and (B is *pB) and (pA = pB) and (A.isConst <= B.isConst)
+ * or (A is &pA) and (B is &pB) and (pA = pB) and (A.isConst <= B.isConst)
+ * or (B is &dyn T) and (A is &C) and (C implemented T)
+ * or (A is &dyn T[C]) and (B is &C)
  *
  * Explicit cast is an extension to implicit cast
  */
+@Suppress("KDocUnresolvedReference")
 internal object CastManager {
 	private val case1: TPairPredicate = { a, b -> a == b }
 	private val case2: TPairPredicate =
@@ -23,25 +27,53 @@ internal object CastManager {
 	private val case5: TPairPredicate = { a, b ->
 		a.asPointerOrNull()?.let { aPointer ->
 			b.asPointerOrNull()?.let { bPointer ->
-				aPointer.elementType == bPointer.elementType
+				aPointer.elementType == bPointer.elementType && aPointer.isConst <= bPointer.isConst
 			}
 		} ?: false
 	}
-	private val allCases = arrayOf(case1, case2, case3, case4, case5)
+	private val case6: TPairPredicate =
+		{ a, b -> a is Type.Reference && b is Type.Reference && a.originalType == b.originalType && a.isConst <= b.isConst }
+	private val case7: TPairPredicate =
+		{ a, b -> b is Type.DynamicReference && a is Type.Reference && a.originalType.implemented(b.trait) }
+	private val case8: TPairPredicate =
+		{ a, b -> a is Type.DynamicReference && b is Type.Reference && a.type == b.originalType }
+	private val allCases = arrayOf(case1, case2, case3, case4, case5, case6, case7, case8)
 
-	fun canImplicitlyCast(from: Type, to: Type) = allCases.any { it(from, to) }
+	internal fun Context.canImplicitlyCast(from: Type, to: Type) = allCases.any { it(from, to) }
 
-	private fun Context.implicitCastOrNull(from: Value, to: Type): Value? =
+	internal fun Context.implicitCastOrNull(from: Value, to: Type): Value? =
 		when {
 			case1(from.type, to) -> from
-			case2(from.type, to) || case5(from.type, to) -> to.new(
-				LLVM.LLVMBuildBitCast(
+			case2(from.type, to) || case5(from.type, to) || case6(from.type, to) ->
+				to.new(from.llvm.bitCast(to.llvm, "pointer_cast"))
+			case7(from.type, to) -> {
+				from.type as Type.Reference
+				to as Type.DynamicReference
+				var dyn = to.undefined().llvm
+				dyn = LLVM.LLVMBuildInsertValue(
 					builder,
-					from.llvm,
-					to.llvm,
-					"pointer_cast"
+					dyn,
+					lookupImpl(to.trait, from.type.originalType).table.getElementPtr(0, 0),
+					0,
+					"insert_table"
 				)
-			)
+				dyn = LLVM.LLVMBuildInsertValue(
+					builder,
+					dyn,
+					from.llvm.bitCast(LLVM.LLVMInt8Type().pointer(), "object_ptr_to_i8_ptr"),
+					1,
+					"insert_object_ptr"
+				)
+				to.new(dyn)
+			}
+			case8(from.type, to) -> {
+				to as Type.Reference
+				from.type as Type.DynamicReference
+				val refType = to.originalType.reference(from.type.isConst)
+				refType.new(
+					LLVM.LLVMBuildExtractValue(builder, from.llvm, 1, "extract_obj_ptr").bitCast(refType.llvm)
+				)
+			}
 			from.type is Type.Reference -> implicitCastOrNull(from.dereference(), to)
 			case4(from.type, to) -> from.also { LLVM.LLVMBuildUnreachable(builder) }
 			else -> null
@@ -59,14 +91,7 @@ internal object CastManager {
 		val destIsPointer = dest.isPointer
 		return when {
 			fromIsPointer && destIsPointer ->
-				dest.new(
-					LLVM.LLVMBuildBitCast(
-						builder,
-						from.llvm,
-						dest.llvm,
-						"pointer_cast"
-					)
-				)
+				dest.new(from.llvm.bitCast(dest.llvm, "pointer_cast"))
 			fromIsPointer && dest is Type.Primitive.Integral ->
 				dest.new(
 					LLVM.LLVMBuildPtrToInt(
@@ -124,6 +149,3 @@ internal object CastManager {
 
 	internal fun Context.explicitCast(from: Value, to: Type) = explicitCastOrNull(from, to) ?: fail(from, to)
 }
-
-@Suppress("NOTHING_TO_INLINE")
-internal inline fun Type.canImplicitlyCastTo(to: Type) = CastManager.canImplicitlyCast(this, to)

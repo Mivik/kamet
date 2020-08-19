@@ -4,6 +4,7 @@ import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
+import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
@@ -13,6 +14,8 @@ internal fun Char.description(): String = "$this (0x${toShort().toString(16)})" 
 internal fun impossible(): Nothing = error("Unreachable code reached!")
 
 internal fun LLVMTypeRef.pointer(): LLVMTypeRef = LLVM.LLVMPointerType(this, 0)
+internal fun LLVMTypeRef.array(size: Int): LLVMTypeRef = LLVM.LLVMArrayType(this, size)
+internal fun LLVMValueRef.dump() = LLVM.LLVMDumpValue(this)
 
 private val escapeMap = mapOf(
 	'\\' to '\\',
@@ -76,6 +79,9 @@ internal fun <T> Set<T>.readOnly() =
 		else -> this
 	}
 
+internal fun String.addIndent() =
+	split('\n').joinToString("\n") { '\t' + it }
+
 internal fun genericName(baseName: String, typeParameters: List<TypeParameter>) =
 	"$baseName<${typeParameters.joinToString()}>"
 
@@ -83,23 +89,31 @@ internal fun actualGenericName(baseName: String, typeArguments: List<Type>) =
 	if (typeArguments.isEmpty()) baseName
 	else "$baseName<${typeArguments.joinToString()}>"
 
-internal fun noMatchingFunction(name: String, argumentTypes: List<Type>): Nothing =
-	error("No matching function for call to ${name.escape()} with argument types: (${argumentTypes.joinToString()})")
+
+internal fun Int.toLLVM() = LLVM.LLVMConstInt(Type.Primitive.Integral.Int.llvm, toLong(), 0)
 
 internal fun Context.findMatchingFunction(
 	name: String,
 	alternatives: Iterable<Function>,
 	receiverType: Type?,
-	argumentTypes: List<Type>
+	argumentTypes: List<Type>,
+	typeArguments: List<Type>
 ): Function {
 	val functions = alternatives.iterator().takeIf { it.hasNext() } ?: error("No function named ${name.escape()}")
 	var found: Function? = null
 	for (function in functions) {
-		if (!function.match(receiverType, argumentTypes)) continue
-		if (found == null) found = function
-		else error("Ambiguous call to function ${name.escape()}: ${function.type} and ${found.type} are both applicable to arguments (${argumentTypes.joinToString()})")
+		val instantiated = function.instantiate(receiverType, argumentTypes, typeArguments) ?: continue
+		if (found == null) found = instantiated
+		else error("Ambiguous call to function ${name.escape()}: ${instantiated.type} and ${found.type} are both applicable to arguments (${argumentTypes.joinToString()})")
 	}
-	return found ?: noMatchingFunction(name, argumentTypes)
+	return found ?: error(
+		"No matching function for call to ${name.escape()} with argument types: ${receiverType.ifNotNull { "$receiverType." }}${
+			actualGenericName(
+				name,
+				typeArguments
+			)
+		}(${argumentTypes.joinToString()})"
+	)
 }
 
 internal inline fun <T : Pointer> buildPointerPointer(size: Int, generator: (Int) -> T): PointerPointer<T> =

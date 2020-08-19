@@ -1,7 +1,7 @@
 package com.mivik.kamet
 
 import com.mivik.kamet.ast.ASTNode
-import com.mivik.kamet.ast.AbstractFunctionNode
+import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.PrototypeNode
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
@@ -21,11 +21,14 @@ class Context(
 	val module: LLVMModuleRef,
 	val builder: LLVMBuilderRef,
 	val currentFunction: Value?,
+	val currentTrait: Trait?,
 	private val valueMap: PersistentMap<String, Value>,
 	private val internalMap: PersistentMap<String, Any>,
 	private val typeMap: PersistentMap<String, Type>,
-	private val functionMap: PersistentListMap<String, Function>,
-	private val genericFunctionMap: PersistentMap<String, Function.Generic>
+	private val functionMap: PersistentGroupingMap<String, Function>,
+	private val genericFunctionMap: PersistentMap<String, Function.Generic>,
+	private val traitMap: PersistentMap<String, Trait>,
+	private val traitImplMap: PersistentGroupingMap<Type, TraitImpl>,
 ) : Disposable {
 	companion object {
 		fun topLevel(moduleName: String): Context =
@@ -33,12 +36,14 @@ class Context(
 				null,
 				LLVM.LLVMModuleCreateWithName(moduleName),
 				LLVM.LLVMCreateBuilder(),
-				null,
+				null, null,
 				PersistentMap(),
 				PersistentMap(),
 				Type.defaultTypeMap.subMap(),
-				PersistentListMap(),
-				PersistentMap()
+				PersistentGroupingMap(),
+				PersistentMap(),
+				PersistentMap(),
+				PersistentGroupingMap()
 			)
 	}
 
@@ -55,8 +60,43 @@ class Context(
 	fun lookupGenericFunction(name: String) =
 		genericFunctionMap[name] ?: error("Unknown generic function ${name.escape()}")
 
+	fun lookupTraitOrNull(name: String) = traitMap[name]
+	fun lookupTrait(name: String) = traitMap[name] ?: error("Unknown trait ${name.escape()}")
+
 	fun hasValue(name: String): Boolean = valueMap.containsKey(name)
-	fun lookupFunctions(name: String, receiverType: Type? = null): Iterable<Function> = functionMap[name]
+	fun lookupFunctions(name: String, receiverType: Type? = null, generic: Boolean = false): Iterable<Function> {
+		val list =
+			mutableListOf<Iterable<Function>>(functionMap[name].filter { it.type.receiverType == receiverType })
+		if (generic) genericFunctionMap[name]?.let { list += listOf(it) }
+		if (receiverType != null) list += traitImplMap[receiverType.dereference()].flatMap { it.trait.functions }
+		return ChainIterable(list.readOnly())
+	}
+
+	fun lookupImplOrNull(trait: Trait, type: Type): TraitImpl? {
+		for (impl in traitImplMap[type])
+			if (impl.trait == trait) return impl
+		return null
+	}
+
+	fun lookupImpl(trait: Trait, type: Type): TraitImpl =
+		lookupImplOrNull(trait, type) ?: error("$trait is not implemented for $type")
+
+	fun Type.implemented(trait: Trait) =
+		when (this) {
+			is Type.Impl -> this.trait == trait
+			is Type.This -> this.trait == trait
+			else -> traitImplMap.has(this) { it.trait == trait }
+		}
+
+	internal fun Value.getElementPtr(vararg indices: Int, name: String = "") =
+		LLVM.LLVMBuildGEP2(
+			builder,
+			type.expect<Type.Pointer>().elementType.llvm,
+			llvm,
+			buildPointerPointer(indices.size) { indices[it].toLLVM() },
+			indices.size,
+			name
+		)
 
 	fun declare(name: String, value: Value) {
 		valueMap[name] = value
@@ -70,24 +110,34 @@ class Context(
 
 	fun declareType(name: String, type: Type) {
 		if (typeMap.containsKey(name)) error("Redeclaration of type ${name.escape()}")
-		require(type.resolved) { "Declaring an unresolved type: $type" }
 		typeMap[name] = type
+	}
+
+	fun declareTrait(trait: Trait) = declareTrait(trait.name, trait)
+
+	fun declareTrait(name: String, trait: Trait) {
+		if (traitMap.containsKey(name)) error("Redeclaration of trait ${name.escape()}")
+		require(trait.resolved) { "Declaring an unresolved trait: $trait" }
+		traitMap[name] = trait
 	}
 
 	fun subContext(
 		function: Value? = currentFunction,
+		trait: Trait? = currentTrait,
 		topLevel: Boolean = false
 	): Context =
 		Context(
 			this,
 			module,
 			if (topLevel) LLVM.LLVMCreateBuilder() else builder,
-			function,
+			function, trait,
 			valueMap.subMap(),
 			internalMap.subMap(),
 			typeMap.subMap(),
 			functionMap.subMap(),
-			genericFunctionMap.subMap()
+			genericFunctionMap.subMap(),
+			traitMap.subMap(),
+			traitImplMap.subMap()
 		)
 
 	inline fun insertAt(block: LLVMBasicBlockRef) {
@@ -109,39 +159,77 @@ class Context(
 	internal inline fun ASTNode.codegen() = with(this) { codegenForThis() }
 	internal inline fun Value.dereference() = with(this) { dereferenceForThis() }
 	internal inline fun ValueRef.setValue(value: Value) = with(this) { setValueForThis(value) }
+	internal inline fun Value.implicitCastOrNull(to: Type) =
+		with(CastManager) { implicitCastOrNull(this@implicitCastOrNull, to) }
+
 	internal inline fun Value.implicitCast(to: Type) = with(CastManager) { implicitCast(this@implicitCast, to) }
 	internal inline fun Value.explicitCast(to: Type) = with(CastManager) { explicitCast(this@explicitCast, to) }
+	internal inline fun Type.canImplicitlyCastTo(to: Type) =
+		with(CastManager) { canImplicitlyCast(this@canImplicitlyCastTo, to) }
+
 	internal inline fun Value.pointerToInt() = explicitCast(Type.pointerAddressType)
 	internal inline fun Type.sizeOf() = Type.pointerAddressType.new(LLVM.LLVMSizeOf(dereference().llvm))
-	internal inline fun AbstractFunctionNode.directCodegen(newName: String? = null) = directCodegenForThis(newName)
+	internal inline fun FunctionGenerator.generate(newName: String? = null) = generateForThis(newName)
 	internal inline fun Function.resolve() = resolveForThis()
+	internal inline fun Trait.resolve() = resolveForThis()
+	internal inline fun PrototypeNode.resolve() = resolveForThis()
+	internal inline fun FunctionNode.resolve() = resolveForThis()
 
-	@Suppress("IfThenToElvis")
-	internal tailrec fun Type.resolve(): Type =
-		if (resolved) this
-		else {
-			val ret = resolveForThis()
-			if (ret == this) this
-			else ret.resolve()
+	internal inline fun Type.transform(noinline action: Context.(Type) -> Type?): Type = transformForThis(action)
+
+	internal inline fun Type.resolve(resolveTypeParameter: Boolean = false): Type {
+		val parameterTable = TypeParameterTable.get()
+		return transform {
+			when {
+				it is Type.Named -> lookupType(it.name)
+				resolveTypeParameter && it is Type.TypeParameter -> parameterTable[it.typeParameter]
+				currentTrait != null && it == Type.UnresolvedThis -> Type.This(currentTrait)
+				else -> null
+			}
 		}
+	}
 
-	internal inline fun Function.invoke(receiver: Value?, arguments: List<Value>) = invokeForThis(receiver, arguments)
+	internal fun LLVMValueRef.bitCast(to: LLVMTypeRef, name: String = "") =
+		LLVM.LLVMBuildBitCast(
+			builder,
+			this,
+			to,
+			name
+		)
+
+	internal inline fun Function.invoke(receiver: Value?, arguments: List<Value>, typeArguments: List<Type>) =
+		invokeForThis(receiver, arguments, typeArguments)
+
 	internal inline fun TypeParameter.check(type: Type) = checkForThis(type)
 	internal inline fun Type.Generic.resolveGeneric(typeArguments: List<Type>) = resolveGenericForThis(typeArguments)
 
-	internal fun Function.match(
+	internal fun Function.instantiate(
 		receiverType: Type?,
-		argumentTypes: List<Type>
-	): Boolean {
+		argumentTypes: List<Type>? = null,
+		typeArguments: List<Type> = emptyList()
+	): Function? {
 		val type = type
 		val parameterTypes = type.parameterTypes
-		if (parameterTypes.size != argumentTypes.size) return false
+		if (argumentTypes != null && parameterTypes.size != argumentTypes.size) return null
+		if (typeArguments.isNotEmpty() && typeParameters.size != typeArguments.size) return null
+
+		// type inference begins
+		val table = TypeParameterTable.get()
+		table.clear()
+		for (i in typeArguments.indices) table[typeParameters[i]] = typeArguments[i]
 		if (receiverType == null) {
-			if (type.receiverType != null) return false
+			if (type.receiverType != null) return null
 		} else {
-			if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return false
+			if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return null
 		}
-		return parameterTypes.indices.all { argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }
+		if (argumentTypes != null && parameterTypes.indices.any { !argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }) return null
+		return if (this is Function.Generic) {
+			val name = node.prototype.name
+			val newTypeArguments = if (typeArguments.isEmpty()) table.map(typeParameters) else typeArguments
+			buildGeneric(name, typeParameters, newTypeArguments) {
+				node.generate(actualGenericName(name, newTypeArguments))
+			}
+		} else this
 	}
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
@@ -164,7 +252,6 @@ class Context(
 	}
 
 	internal fun declareFunction(prototype: PrototypeNode, value: Function) {
-		require(value.resolved) { "Declaring an unresolved function" }
 		if (value is Function.Generic) {
 			if (genericFunctionMap.containsKey(prototype.name)) error("Generic function redeclared: ${prototype.name}")
 			genericFunctionMap[prototype.name] = value
@@ -179,6 +266,12 @@ class Context(
 			error("Function ${prototype.name} redeclared with same parameter types: (${parameterTypes.joinToString()})")
 		}
 		functionMap.add(prototype.name, value)
+	}
+
+	internal fun declareTraitImpl(impl: TraitImpl) {
+		if (traitImplMap.has(impl.type) { impl.trait == it.trait }) error("Re-implementation of ${impl.trait} for ${impl.type}")
+		traitImplMap.add(impl.type, impl)
+		with(impl) { initialize() }
 	}
 
 	internal fun genericContext(typeParameters: List<TypeParameter>, typeArguments: List<Type>): Context {
@@ -199,6 +292,7 @@ class Context(
 	): R {
 		val genericName = actualGenericName(name, typeArguments)
 		internalMap[genericName]?.let { return it as R }
+		TypeParameterTable.set(typeParameters, typeArguments)
 		return with(genericContext(typeParameters, typeArguments), block)
 			.also { declareInternal(genericName, it) }
 	}

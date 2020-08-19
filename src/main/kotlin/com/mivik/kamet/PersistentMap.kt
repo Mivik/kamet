@@ -24,9 +24,9 @@ class PersistentMap<K, V>(
 	fun subMap() = PersistentMap(this)
 }
 
-class PersistentListMap<K, V>(
-	private val parent: PersistentListMap<K, V>? = null,
-	private val delegate: MutableMap<K, MutableList<V>> = mutableMapOf()
+class PersistentGroupingMap<K, V>(
+	val parent: PersistentGroupingMap<K, V>? = null,
+	val delegate: MutableMap<K, MutableList<V>> = mutableMapOf()
 ) {
 	fun containsKey(key: K): Boolean {
 		var current = this
@@ -49,17 +49,17 @@ class PersistentListMap<K, V>(
 		}
 	}
 
-	fun contains(key: K, value: V): Boolean {
+	fun contains(key: K, value: V): Boolean = has(key) { it == value }
+
+	inline fun has(key: K, predict: (V) -> Boolean): Boolean {
 		var current = this
 		while (true) {
-			current.delegate[key]?.let {
-				if (it.contains(value)) return true
-			}
+			current.delegate[key]?.forEach { if (predict(it)) return true }
 			current = current.parent ?: return false
 		}
 	}
 
 	operator fun get(key: K): Iterable<V> = ChainIterable(collect(key).readOnly())
 
-	fun subMap() = PersistentListMap(this)
+	fun subMap() = PersistentGroupingMap(this)
 }

@@ -2,6 +2,7 @@ package com.mivik.kamet.ast
 
 import com.mivik.kamet.Context
 import com.mivik.kamet.Value
+import com.mivik.kamet.addIndent
 
 internal class BlockNode : ASTNode {
 	val elements: MutableList<ASTNode> = mutableListOf()
@@ -13,7 +14,7 @@ internal class BlockNode : ASTNode {
 
 	override fun toString(): String =
 		if (elements.isEmpty()) "{}"
-		else "{\n${elements.joinToString("\n").split('\n').joinToString("\n") { '\t' + it }}\n}"
+		else "{\n${elements.joinToString("\n").addIndent()}\n}"
 
 	override val returned: Boolean
 		get() = elements.isNotEmpty() && elements.last().returned

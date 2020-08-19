@@ -12,6 +12,7 @@ import com.mivik.kamet.ast.GenericFunctionNode
 import com.mivik.kamet.ast.GenericPrototypeNode
 import com.mivik.kamet.ast.GenericStructNode
 import com.mivik.kamet.ast.IfNode
+import com.mivik.kamet.ast.ImplNode
 import com.mivik.kamet.ast.NewNode
 import com.mivik.kamet.ast.PointerSubscriptNode
 import com.mivik.kamet.ast.PrototypeNode
@@ -19,6 +20,7 @@ import com.mivik.kamet.ast.ReturnNode
 import com.mivik.kamet.ast.SizeOfNode
 import com.mivik.kamet.ast.StructNode
 import com.mivik.kamet.ast.TopLevelNode
+import com.mivik.kamet.ast.TraitNode
 import com.mivik.kamet.ast.UnaryOpNode
 import com.mivik.kamet.ast.UndefNode
 import com.mivik.kamet.ast.ValDeclareNode
@@ -160,11 +162,8 @@ internal class Parser(private val lexer: Lexer) {
 			is Token.Identifier ->
 				when (peek()) {
 					Token.LeftParenthesis, BinOp.Less -> {
-						val function = takeTypeArguments().let {
-							if (it.isEmpty()) Function.Named(token.name)
-							else Function.ActualGeneric(token.name, it)
-						}
-						CallNode(function, null, takeArguments())
+						val typeArguments = takeTypeArguments()
+						CallNode(Function.Named(token.name), null, takeArguments(), typeArguments)
 					}
 					else -> ValueNode(token.name)
 				}
@@ -294,9 +293,20 @@ internal class Parser(private val lexer: Lexer) {
 		return Type.Function(receiverType, takeType(), types)
 	}
 
+	fun takeTrait(): Trait =
+		Trait.Named(trimAndTake().expect<Token.Identifier>().name)
+
 	fun takeTypeParameter(): TypeParameter =
 		when (val token = trimAndTake()) {
-			is Token.Identifier -> TypeParameter(token.name)
+			is Token.Identifier -> {
+				val name = token.name.also {
+					if (it == "This") error("\"This\" can not be the name of a type parameter")
+				}
+				if (peek() == Token.Colon) {
+					take()
+					TypeParameter.Trait(name, takeTrait())
+				} else TypeParameter.Simple(name)
+			}
 			else -> unexpected(token)
 		}
 
@@ -325,7 +335,7 @@ internal class Parser(private val lexer: Lexer) {
 			BinOp.BitwiseAnd -> { // &(const )type
 				val isConst = peek() == Token.Const
 				if (isConst) take()
-				Type.Reference(takeType(), isConst)
+				takeType().reference(isConst)
 			}
 			BinOp.Multiply -> { // *(const )type
 				val isConst = peek() == Token.Const
@@ -369,6 +379,7 @@ internal class Parser(private val lexer: Lexer) {
 					if (peek() == BinOp.Less) Type.ActualGeneric(it, takeTypeArguments())
 					else it
 				}
+			Token.ThisType -> Type.UnresolvedThis
 			else -> unexpected(token)
 		}.let {
 			if (peek() == BinOp.AccessMember) {
@@ -394,7 +405,7 @@ internal class Parser(private val lexer: Lexer) {
 		}
 	}
 
-	fun takePrototype(): ASTNode {
+	fun takePrototype(): FunctionGenerator {
 		trimAndTake().expect<Token.Function>()
 		val typeParameters = takeTypeParameterList()
 		val type = takeType()
@@ -424,8 +435,7 @@ internal class Parser(private val lexer: Lexer) {
 		}
 	}
 
-	@Suppress("NOTHING_TO_INLINE")
-	inline fun takeFunctionOrPrototype(): ASTNode {
+	private fun takeFunctionOrPrototype(): FunctionGenerator {
 		val prototype = takePrototype()
 		return if (peek() is Token.LeftBrace) {
 			val block = takeBlock()
@@ -435,8 +445,8 @@ internal class Parser(private val lexer: Lexer) {
 				})
 			else {
 				prototype as GenericPrototypeNode
-				GenericFunctionNode(FunctionNode(prototype.node, block.also {
-					if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.node.type.returnType))
+				GenericFunctionNode(FunctionNode(prototype.prototype, block.also {
+					if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.prototype.type.returnType))
 				}), prototype.typeParameters)
 			}
 		} else prototype
@@ -457,6 +467,38 @@ internal class Parser(private val lexer: Lexer) {
 		else GenericStructNode(consumeAttrs(), name, list.readOnly(), typeParameters.readOnly())
 	}
 
+	fun takeTraitDecl(): TraitNode {
+		take().expect<Token.Trait>()
+		val name = take().expect<Token.Identifier>().name
+		trimAndTake().expect<Token.LeftBrace>()
+		val elements = mutableListOf<FunctionGenerator>()
+		takeList(Token.RightBrace) {
+			val stuff = takeFunctionOrPrototype()
+			stuff.prototype.type.receiverType.let {
+				require(
+					it != null &&
+							((it == Type.UnresolvedThis) || (it is Type.Reference && it.originalType == Type.UnresolvedThis))
+				) { "Functions in trait requires This or reference to This as receiver type" }
+			}
+			require(stuff is PrototypeNode || stuff is FunctionNode) { "Generic functions are not supported in trait" }
+			elements += stuff
+		}
+		return TraitNode(name, elements)
+	}
+
+	fun takeImpl(): ImplNode {
+		take().expect<Token.Impl>()
+		val trait = Trait.Named(take().expect<Token.Identifier>().name)
+		take().expect<Token.For>()
+		val type = takeType()
+		trimAndTake().expect<Token.LeftBrace>()
+		val elements = mutableListOf<FunctionNode>()
+		takeList(Token.RightBrace) {
+			elements += takeFunctionOrPrototype() as? FunctionNode ?: error("Expected implemented function")
+		}
+		return ImplNode(trait, type, elements)
+	}
+
 	fun parse(): TopLevelNode {
 		val list = mutableListOf<ASTNode>()
 		while (true) {
@@ -464,8 +506,10 @@ internal class Parser(private val lexer: Lexer) {
 				Token.Function -> list += takeFunctionOrPrototype().also {
 					if (it is PrototypeNode)
 						require(it.extern) { "Function without implementation is not allowed" }
-				}
+				} as ASTNode
 				Token.Struct -> list += takeStruct()
+				Token.Trait -> list += takeTraitDecl()
+				Token.Impl -> list += takeImpl()
 				Token.NumberSign -> takeAttributes()
 				Token.EOF -> return TopLevelNode(list.readOnly())
 				else -> TODO()

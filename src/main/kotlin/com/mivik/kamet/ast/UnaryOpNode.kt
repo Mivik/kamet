@@ -8,6 +8,7 @@ import com.mivik.kamet.ValueRef
 import com.mivik.kamet.expect
 import com.mivik.kamet.impossible
 import com.mivik.kamet.pointer
+import com.mivik.kamet.toLLVM
 import org.bytedeco.llvm.global.LLVM
 
 internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val postfix: Boolean = false) : ASTNode {
@@ -43,7 +44,7 @@ internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val postfix: Boo
 								LLVM.LLVMBuildAdd(
 									builder,
 									value.dereference().llvm,
-									LLVM.LLVMConstInt(originalType.llvm, 1L, 0),
+									1.toLLVM(),
 									"increment"
 								)
 							is Type.Primitive.Real ->
