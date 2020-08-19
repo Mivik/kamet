@@ -75,7 +75,7 @@ internal class KametTest {
 	fun undefined() {
 		"""
 			#[no_mangle] fun main(): Int {
-				val x: Int
+				let x: Int
 				return x
 			}
 		""".trimIndent().tryCompile()
@@ -120,14 +120,14 @@ internal class KametTest {
 		assertEquals(
 			6310,
 			"""
-				const var x: [Int, 5]
-				val first: &Int = x[0]
+				val x: [Int, 5]
+				let first: &Int = x[0]
 				first = 1926
-				val second: *Int = &x[1]
+				let second: *Int = &x[1]
 				*second = 817
-				val third: *Int = second+1
+				let third: *Int = second+1
 				*third = 2333
-				val forth: *Int = x+3
+				let forth: *Int = x+3
 				*forth = 1234
 				x[0]+x[1]+x[2]+x[3]
 			""".trimIndent().evaluate(Type.Primitive.Integral.Int).int
@@ -142,9 +142,9 @@ internal class KametTest {
 				
 				#[no_mangle] fun test(): Double {
 					var test: Test
-					val intPointer: *Int = test.a
+					let intPointer: *Int = test.a
 					intPointer[0] = 123
-					val doublePointer: *Double = test.b
+					let doublePointer: *Double = test.b
 					doublePointer[1] = 233.5
 					return test.a[0]+test.b[1]
 				}
@@ -164,8 +164,8 @@ internal class KametTest {
 					a: Int,
 					b: Boolean
 				}
-				val a: A
-				val b: B
+				let a: A
+				let b: B
 			}
 		""".trimIndent().tryCompile()
 	}
@@ -175,9 +175,9 @@ internal class KametTest {
 		assertEquals(
 			2,
 			"""
-				val a: *Int = new Int
+				let a: *Int = new Int
 				*a = 2
-				val ret = *a
+				let ret = *a
 				ret
 			""".trimIndent().evaluate(Type.Primitive.Integral.Int).int
 		)
@@ -186,14 +186,14 @@ internal class KametTest {
 			2,
 			"""
 				fun get(): *Int {
-					val a: *Int = new Int
+					let a: *Int = new Int
 					*a = 2
 					return a
 				}
 				
 				#[no_mangle] fun test(): Int {
-					val ptr = get()
-					val ret = *ptr
+					let ptr = get()
+					let ret = *ptr
 					delete ptr
 					return ret
 				}
@@ -245,7 +245,7 @@ internal class KametTest {
 			"""
 				fun test() {
 					#[extern]
-					val a: Int
+					let a: Int
 				}
 			""".trimIndent().tryCompile()
 		}
@@ -365,8 +365,8 @@ internal class KametTest {
 			fun <T> max(a: T, b: T): T { return if (a>b) a else b }
 			
 			fun test() {
-				val int = max(max(1, 3), max(2, 4))
-				val double = max(max(1.2, 3.5), max(2.4, 5.7))
+				let int = max(max(1, 3), max(2, 4))
+				let double = max(max(1.2, 3.5), max(2.4, 5.7))
 			}
 		""".trimIndent().tryCompile()
 		assertFails {
@@ -403,7 +403,7 @@ internal class KametTest {
 				}
 				
 				#[no_mangle] fun test(): Int {
-					const var square: Square
+					val square: Square
 					var arbitrary: Arbitrary
 					arbitrary.count = 5
 					return square.side_count()+arbitrary.side_count()

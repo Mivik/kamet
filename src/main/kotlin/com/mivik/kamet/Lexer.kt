@@ -12,6 +12,7 @@ internal sealed class Token {
 
 	object Val : Token()
 	object Var : Token()
+	object Let: Token()
 	object LeftParenthesis : Token()
 	object RightParenthesis : Token()
 	object LeftBracket : Token()
@@ -113,7 +114,7 @@ private enum class State : LexerState {
 }
 
 private enum class Action : LexerAction {
-	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL, FOR,
+	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL, FOR, LET,
 	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL, NEW, DELETE, THIS_TYPE,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN, IMPL, TRAIT, THIS
 }
@@ -135,6 +136,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"'(\\\\u[0-9a-fA-F]{4}|\\\\.|.)'" action Action.CHAR_LITERAL
 				"val" action Action.VAL
 				"var" action Action.VAR
+				"let" action Action.LET
 				"fun" action Action.FUNCTION
 				"return" action Action.RETURN
 				"while" action Action.WHILE
@@ -179,6 +181,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 		when (Action.values()[action - 1]) {
 			Action.VAL -> returnValue(Token.Val)
 			Action.VAR -> returnValue(Token.Var)
+			Action.LET -> returnValue(Token.Let)
 			Action.NEWLINE -> returnValue(Token.Newline)
 			Action.FUNCTION -> returnValue(Token.Function)
 			Action.RETURN -> returnValue(Token.Return)

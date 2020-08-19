@@ -23,7 +23,7 @@ import com.mivik.kamet.ast.TopLevelNode
 import com.mivik.kamet.ast.TraitNode
 import com.mivik.kamet.ast.UnaryOpNode
 import com.mivik.kamet.ast.UndefNode
-import com.mivik.kamet.ast.ValDeclareNode
+import com.mivik.kamet.ast.LetDeclareNode
 import com.mivik.kamet.ast.ValueNode
 import com.mivik.kamet.ast.VarDeclareNode
 import com.mivik.kamet.ast.WhileNode
@@ -203,7 +203,7 @@ internal class Parser(private val lexer: Lexer) {
 	fun takeStmt(): ASTNode =
 		when (trimAndPeek()) {
 			Token.Struct -> takeStruct()
-			Token.Val -> {
+			Token.Let -> {
 				take()
 				val name = take().expect<Token.Identifier>().name
 				var type: Type? = null
@@ -213,17 +213,11 @@ internal class Parser(private val lexer: Lexer) {
 				}
 				if (peek() == BinOp.Assign) {
 					take()
-					ValDeclareNode(name, type, takeExpr())
-				} else ValDeclareNode(name, null, UndefNode(type!!))
+					LetDeclareNode(name, type, takeExpr())
+				} else LetDeclareNode(name, null, UndefNode(type!!))
 			}
-			Token.Const, Token.Var -> {
-				val isConst =
-					if (peek() == Token.Const) {
-						take()
-						trimAndPeek().expect<Token.Var>()
-						true
-					} else false
-				take()
+			Token.Val, Token.Var -> {
+				val isConst = take() == Token.Val
 				val name = take().expect<Token.Identifier>().name
 				var type: Type? = null
 				if (peek() == Token.Colon) {

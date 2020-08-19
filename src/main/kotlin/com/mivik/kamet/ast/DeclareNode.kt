@@ -17,7 +17,7 @@ private fun Context.convert(value: Value, expected: Type? = null): Value {
 private inline fun unclearVariable(name: String): Nothing =
 	error("Declaration of variable ${name.escape()} without type or initializer")
 
-internal class ValDeclareNode(
+internal class LetDeclareNode(
 	val name: String,
 	val type: Type? = null,
 	val defaultValue: ASTNode? = null
