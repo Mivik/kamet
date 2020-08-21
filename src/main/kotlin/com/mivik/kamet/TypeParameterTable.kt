@@ -17,12 +17,21 @@ internal class TypeParameterTable private constructor(private val delegate: Muta
 
 		fun get(): TypeParameterTable = threadLocal.get()
 
-		fun clear() {
-			get().clear()
+		inline fun <R> scope(block: TypeParameterTable.() -> R): R {
+			val table = get()
+			table.clear()
+			table.enabled = true
+			val ret = table.block()
+			table.enabled = false
+			table.clear()
+			return ret
 		}
 	}
 
+	var enabled = false
+
 	fun equals(typeParameter: TypeParameter, other: Type): Boolean {
+		if (!enabled) return false
 		this[typeParameter]?.let { return it == other }
 		this[typeParameter] = other
 		return true

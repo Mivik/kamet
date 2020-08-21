@@ -410,5 +410,28 @@ internal class KametTest {
 				}
 			""".trimIndent().runFunction("test").int
 		)
+		assertEquals(
+			3,
+			"""
+				trait Number {
+					fun &const This.value(): Int
+				
+					fun &const This.inc(): Int {
+						return this.value()+1
+					}
+				}
+				
+				struct One {}
+				
+				impl Number for One {
+					fun &const This.value(): Int { return 1 }
+				}
+				
+				#[no_mangle] fun test(): Int {
+					val one: One
+					return one.value()+one.inc()
+				}
+			""".trimIndent().runFunction("test").int
+		)
 	}
 }

@@ -89,7 +89,6 @@ internal fun actualGenericName(baseName: String, typeArguments: List<Type>) =
 	if (typeArguments.isEmpty()) baseName
 	else "$baseName<${typeArguments.joinToString()}>"
 
-
 internal fun Int.toLLVM() = LLVM.LLVMConstInt(Type.Primitive.Integral.Int.llvm, toLong(), 0)
 
 internal fun Context.findMatchingFunction(

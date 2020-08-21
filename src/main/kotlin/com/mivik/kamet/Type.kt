@@ -3,6 +3,7 @@ package com.mivik.kamet
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
 import org.bytedeco.llvm.global.LLVM
+import java.util.Objects
 
 private inline fun <reified T : Type> T.typeEquals(otherType: Any?, block: (T) -> Boolean): Boolean {
 	if (this === otherType) return true
@@ -85,6 +86,8 @@ sealed class Type {
 	class Named(override val name: String) : Abstract() {
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { name == it.name }
+
+		override fun hashCode(): Int = name.hashCode()
 	}
 
 	open class TypeParameter(val typeParameter: com.mivik.kamet.TypeParameter) : Abstract() {
@@ -93,6 +96,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { false }
+
+		override fun hashCode(): Int = typeParameter.hashCode()
 	}
 
 	class Array(
@@ -109,6 +114,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { elementType == it.elementType && size == it.size && isConst == it.isConst }
+
+		override fun hashCode(): Int = Objects.hash(elementType, size, isConst)
 	}
 
 	class Function(val receiverType: Type?, val returnType: Type, val parameterTypes: List<Type>) : Composed() {
@@ -147,6 +154,8 @@ sealed class Type {
 						&& returnType == it.returnType
 						&& parameterTypes == it.parameterTypes
 			}
+
+		override fun hashCode(): Int = Objects.hash(receiverType, returnType, parameterTypes)
 	}
 
 	class Struct(override val name: String, val elements: List<Pair<String, Type>>, private val packed: Boolean) :
@@ -178,6 +187,8 @@ sealed class Type {
 						&& elements == it.elements
 						&& packed == it.packed
 			}
+
+		override fun hashCode(): Int = Objects.hash(name, elements, packed)
 	}
 
 	sealed class Primitive(override val name: String, val sizeInBits: Int, override val llvm: LLVMTypeRef) : Type() {
@@ -221,6 +232,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { originalType == it.originalType && isConst == it.isConst }
+
+		override fun hashCode(): Int = Objects.hash(originalType, isConst)
 	}
 
 	class Pointer(val elementType: Type, val isConst: Boolean) : Type() {
@@ -239,6 +252,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { elementType == it.elementType && isConst == it.isConst }
+
+		override fun hashCode(): Int = Objects.hash(elementType, isConst)
 	}
 
 	class Generic(val baseType: Type, val typeParameters: List<com.mivik.kamet.TypeParameter>) : Abstract() {
@@ -254,6 +269,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { baseType == it.baseType && typeParameters == it.typeParameters }
+
+		override fun hashCode(): Int = Objects.hash(baseType, typeParameters)
 	}
 
 	class ActualGeneric(val genericType: Type, val typeArguments: List<Type>) : Abstract() {
@@ -267,6 +284,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { genericType == it.genericType && typeArguments == it.typeArguments }
+
+		override fun hashCode(): Int = Objects.hash(genericType, typeArguments)
 	}
 
 	class DynamicReference(val trait: Trait, val type: Type?, isConst: Boolean) :
@@ -292,6 +311,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { trait == it.trait }
+
+		override fun hashCode(): Int = trait.hashCode()
 	}
 
 	object UnresolvedThis : Abstract() {
@@ -305,6 +326,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { trait == it.trait }
+
+		override fun hashCode(): Int = trait.hashCode()
 	}
 
 	class Impl(val trait: Trait) : Abstract() {
@@ -313,6 +336,8 @@ sealed class Type {
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { trait == it.trait }
+
+		override fun hashCode(): Int = trait.hashCode()
 	}
 }
 

@@ -9,6 +9,7 @@ import com.mivik.kamet.TypeParameter
 import com.mivik.kamet.TypeParameterTable
 import com.mivik.kamet.Value
 import com.mivik.kamet.addIndent
+import com.mivik.kamet.expect
 
 internal class TraitNode(val name: String, val elements: List<FunctionGenerator>) : ASTNode {
 	override fun Context.codegenForThis(): Value {
@@ -20,18 +21,22 @@ internal class TraitNode(val name: String, val elements: List<FunctionGenerator>
 			for (element in elements) {
 				if (element is PrototypeNode) {
 					prototypes += element.prototype.resolve()
-				} else implementedFunctions += TODO() as Function.Generic
+				} else implementedFunctions += Function.Generic.obtain(
+					this,
+					element.expect<FunctionNode>().resolve(),
+					listOf(TypeParameter.This(trait))
+				)
 			}
 		}
 		prototypes.sortBy { it.functionName }
-		val table = TypeParameterTable.get()
-		table.clear()
-		table[TypeParameter.This(trait)] = Type.Dynamic(trait, null)
-		for ((index, prototype) in prototypes.withIndex())
-			abstractFunctions += Function.Dynamic(
-				index,
-				prototype.type.resolve(true) as Type.Function
-			)
+		TypeParameterTable.scope {
+			set(TypeParameter.This(trait), Type.Dynamic(trait, null))
+			for ((index, prototype) in prototypes.withIndex())
+				abstractFunctions += Function.Dynamic(
+					index,
+					prototype.type.resolve(true) as Type.Function
+				)
+		}
 		declareTrait(trait)
 		return Value.Unit
 	}

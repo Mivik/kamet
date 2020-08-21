@@ -466,7 +466,7 @@ internal class Parser(private val lexer: Lexer) {
 		val name = take().expect<Token.Identifier>().name
 		trimAndTake().expect<Token.LeftBrace>()
 		val elements = mutableListOf<FunctionGenerator>()
-		takeList(Token.RightBrace) {
+		while (true) {
 			val stuff = takeFunctionOrPrototype()
 			stuff.prototype.type.receiverType.let {
 				require(
@@ -476,6 +476,10 @@ internal class Parser(private val lexer: Lexer) {
 			}
 			require(stuff is PrototypeNode || stuff is FunctionNode) { "Generic functions are not supported in trait" }
 			elements += stuff
+			if (trimAndPeek()==Token.RightBrace) {
+				take()
+				break
+			}
 		}
 		return TraitNode(name, elements)
 	}

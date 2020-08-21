@@ -68,7 +68,12 @@ class Context(
 		val list =
 			mutableListOf<Iterable<Function>>(functionMap[name].filter { it.type.receiverType == receiverType })
 		if (generic) genericFunctionMap[name]?.let { list += listOf(it) }
-		if (receiverType != null) list += traitImplMap[receiverType.dereference()].flatMap { it.trait.functions }
+		if (receiverType != null)
+			traitImplMap[receiverType.dereference()].forEach { impl ->
+				val trait = impl.trait
+				list += trait.implementedFunctions.filter { it.node.prototype.name == name }
+				list += trait.abstractFunctions.filterIndexed { index, _ -> trait.prototypes[index].name == name }
+			}
 		return ChainIterable(list.readOnly())
 	}
 
@@ -214,22 +219,26 @@ class Context(
 		if (typeArguments.isNotEmpty() && typeParameters.size != typeArguments.size) return null
 
 		// type inference begins
-		val table = TypeParameterTable.get()
-		table.clear()
-		for (i in typeArguments.indices) table[typeParameters[i]] = typeArguments[i]
-		if (receiverType == null) {
-			if (type.receiverType != null) return null
-		} else {
-			if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return null
-		}
-		if (argumentTypes != null && parameterTypes.indices.any { !argumentTypes[it].canImplicitlyCastTo(parameterTypes[it]) }) return null
-		return if (this is Function.Generic) {
-			val name = node.prototype.name
-			val newTypeArguments = if (typeArguments.isEmpty()) table.map(typeParameters) else typeArguments
-			buildGeneric(name, typeParameters, newTypeArguments) {
-				node.generate(actualGenericName(name, newTypeArguments))
+		return TypeParameterTable.scope {
+			for (i in typeArguments.indices) set(typeParameters[i], typeArguments[i])
+			if (receiverType == null) {
+				if (type.receiverType != null) return null
+			} else {
+				if (type.receiverType == null || !receiverType.canImplicitlyCastTo(type.receiverType)) return null
 			}
-		} else this
+			if (argumentTypes != null && parameterTypes.indices.any {
+					!argumentTypes[it].canImplicitlyCastTo(
+						parameterTypes[it]
+					)
+				}) return null
+			if (this@instantiate is Function.Generic) {
+				val name = node.prototype.name
+				val newTypeArguments = if (typeArguments.isEmpty()) map(typeParameters) else typeArguments
+				buildGeneric(name, typeParameters, newTypeArguments) {
+					node.generate(actualGenericName(name, newTypeArguments))
+				}
+			} else this@instantiate
+		}
 	}
 
 	fun allocate(type: LLVMTypeRef, name: String? = null): LLVMValueRef {
