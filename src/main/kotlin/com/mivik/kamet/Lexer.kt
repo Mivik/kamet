@@ -12,7 +12,7 @@ internal sealed class Token {
 
 	object Val : Token()
 	object Var : Token()
-	object Let: Token()
+	object Let : Token()
 	object LeftParenthesis : Token()
 	object RightParenthesis : Token()
 	object LeftBracket : Token()

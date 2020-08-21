@@ -13,6 +13,7 @@ import com.mivik.kamet.ast.GenericPrototypeNode
 import com.mivik.kamet.ast.GenericStructNode
 import com.mivik.kamet.ast.IfNode
 import com.mivik.kamet.ast.ImplNode
+import com.mivik.kamet.ast.LetDeclareNode
 import com.mivik.kamet.ast.NewNode
 import com.mivik.kamet.ast.PointerSubscriptNode
 import com.mivik.kamet.ast.PrototypeNode
@@ -23,7 +24,6 @@ import com.mivik.kamet.ast.TopLevelNode
 import com.mivik.kamet.ast.TraitNode
 import com.mivik.kamet.ast.UnaryOpNode
 import com.mivik.kamet.ast.UndefNode
-import com.mivik.kamet.ast.LetDeclareNode
 import com.mivik.kamet.ast.ValueNode
 import com.mivik.kamet.ast.VarDeclareNode
 import com.mivik.kamet.ast.WhileNode
@@ -476,7 +476,7 @@ internal class Parser(private val lexer: Lexer) {
 			}
 			require(stuff is PrototypeNode || stuff is FunctionNode) { "Generic functions are not supported in trait" }
 			elements += stuff
-			if (trimAndPeek()==Token.RightBrace) {
+			if (trimAndPeek() == Token.RightBrace) {
 				take()
 				break
 			}

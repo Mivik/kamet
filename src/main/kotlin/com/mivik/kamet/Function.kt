@@ -45,14 +45,17 @@ sealed class Function : Resolvable {
 		override val type: Type.Function
 			get() = error("Undetermined")
 
-		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>, typeArguments: List<Type>): Value =
-			findMatchingFunction(
+		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>, typeArguments: List<Type>): Value {
+			val autoReceiver = receiver ?: lookupValueOrNull("this")
+			val function = findMatchingFunction(
 				name,
-				lookupFunctions(name, receiver?.type, true),
-				receiver?.type,
+				lookupFunctions(name, autoReceiver?.type, true),
+				autoReceiver?.type,
 				arguments.map { it.type },
 				typeArguments
-			).invoke(receiver, arguments, typeArguments)
+			)
+			return function.invoke(autoReceiver, arguments, typeArguments)
+		}
 
 		override fun toString(): String = name
 	}

@@ -324,7 +324,7 @@ internal class KametTest {
 					b: Int
 				}
 				
-				fun &Test.sum(): Int { return this.a+this.b }
+				fun &Test.sum(): Int { return a+b }
 				
 				#[no_mangle] fun test(): Int {
 					var test: Test
@@ -399,7 +399,7 @@ internal class KametTest {
 				}
 				
 				impl Polygon for Arbitrary {
-					fun &const This.side_count(): Int { return this.count }
+					fun &const This.side_count(): Int { return count }
 				}
 				
 				#[no_mangle] fun test(): Int {
@@ -417,7 +417,7 @@ internal class KametTest {
 					fun &const This.value(): Int
 				
 					fun &const This.inc(): Int {
-						return this.value()+1
+						return value()+1
 					}
 				}
 				
