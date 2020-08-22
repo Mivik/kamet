@@ -3,6 +3,7 @@ package com.mivik.kamet.ast
 import com.mivik.kamet.Context
 import com.mivik.kamet.Function
 import com.mivik.kamet.FunctionGenerator
+import com.mivik.kamet.Prototype
 import com.mivik.kamet.Trait
 import com.mivik.kamet.Type
 import com.mivik.kamet.TypeParameter
@@ -15,7 +16,7 @@ internal class TraitNode(val name: String, val elements: List<FunctionGenerator>
 	override fun Context.codegenForThis(): Value {
 		val implementedFunctions = mutableListOf<Function.Generic>()
 		val abstractFunctions = mutableListOf<Function.Dynamic>()
-		val prototypes = mutableListOf<PrototypeNode>()
+		val prototypes = mutableListOf<Prototype>()
 		val trait = Trait.Base(name, implementedFunctions, abstractFunctions, prototypes)
 		with(subContext(trait = trait)) {
 			for (element in elements) {
@@ -28,7 +29,7 @@ internal class TraitNode(val name: String, val elements: List<FunctionGenerator>
 				)
 			}
 		}
-		prototypes.sortBy { it.functionName }
+		prototypes.sortBy { it.mangledName }
 		TypeParameterTable.scope {
 			set(TypeParameter.This(trait), Type.Dynamic(trait, null))
 			for ((index, prototype) in prototypes.withIndex())

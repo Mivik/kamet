@@ -13,16 +13,16 @@ internal class ImplNode(val trait: Trait, val type: Type, val elements: List<Fun
 	override fun Context.codegenForThis(): Value {
 		val trait = trait.resolve()
 		val type = type.resolve()
-		val elements = elements.sortedBy { it.prototype.functionName }
+		val elements = elements.sortedBy { it.node.functionName }
 		val prototypes = trait.prototypes
 		val functions = mutableListOf<Function.Generic>()
 		with(subContext(trait = trait)) {
 			for ((index, oldElement) in elements.withIndex()) {
 				val element = oldElement.resolve()
-				if (element.prototype != prototypes[index]) error("Unknown implemented function: ${element.prototype}")
+				if (element.prototype != prototypes[index]) error("Unknown implemented function: ${element.node}")
 				functions += Function.Generic.obtain(
 					this,
-					element.rename("${element.prototype.name}|$type"),
+					element.rename("${element.node.prototype.name}<$type>"),
 					listOf(TypeParameter.This(trait))
 				)
 			}

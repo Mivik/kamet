@@ -179,6 +179,7 @@ class Context(
 	internal inline fun Trait.resolve() = resolveForThis()
 	internal inline fun PrototypeNode.resolve() = resolveForThis()
 	internal inline fun FunctionNode.resolve() = resolveForThis()
+	internal inline fun Prototype.resolve() = resolveForThis()
 
 	internal inline fun Type.transform(noinline action: Context.(Type) -> Type?): Type = transformForThis(action)
 
@@ -260,7 +261,7 @@ class Context(
 		return ret
 	}
 
-	internal fun declareFunction(prototype: PrototypeNode, value: Function) {
+	internal fun declareFunction(prototype: Prototype, value: Function) {
 		if (value is Function.Generic) {
 			if (genericFunctionMap.containsKey(prototype.name)) error("Generic function redeclared: ${prototype.name}")
 			genericFunctionMap[prototype.name] = value

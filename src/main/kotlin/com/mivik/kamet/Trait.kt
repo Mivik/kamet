@@ -1,13 +1,11 @@
 package com.mivik.kamet
 
-import com.mivik.kamet.ast.PrototypeNode
-
 private fun unresolved(): Nothing = error("Getting the functions of an un-resolved trait.")
 
 sealed class Trait(val name: String) : Resolvable {
 	abstract val implementedFunctions: Iterable<Function.Generic>
 	abstract val abstractFunctions: List<Function.Dynamic>
-	internal abstract val prototypes: List<PrototypeNode>
+	internal abstract val prototypes: List<Prototype>
 	abstract override fun Context.resolveForThis(): Trait
 	val functions by lazy { concat(implementedFunctions, abstractFunctions) }
 	override fun hashCode(): Int = name.hashCode()
@@ -26,7 +24,7 @@ sealed class Trait(val name: String) : Resolvable {
 			get() = unresolved()
 		override val abstractFunctions: List<Function.Dynamic>
 			get() = unresolved()
-		override val prototypes: List<PrototypeNode>
+		override val prototypes: List<Prototype>
 			get() = unresolved()
 	}
 
@@ -34,7 +32,7 @@ sealed class Trait(val name: String) : Resolvable {
 		name: String,
 		override val implementedFunctions: Iterable<Function.Generic>,
 		override val abstractFunctions: List<Function.Dynamic>,
-		override val prototypes: List<PrototypeNode>
+		override val prototypes: List<Prototype>
 	) : Trait(name) {
 		override val resolved: Boolean
 			get() = true

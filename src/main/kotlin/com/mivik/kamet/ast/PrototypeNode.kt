@@ -5,6 +5,7 @@ import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
 import com.mivik.kamet.Function
 import com.mivik.kamet.FunctionGenerator
+import com.mivik.kamet.Prototype
 import com.mivik.kamet.Type
 import com.mivik.kamet.TypeParameter
 import com.mivik.kamet.Value
@@ -19,15 +20,10 @@ private fun buildString(attributes: Attributes, name: String, type: Type.Functio
 @Suppress("EqualsOrHashCode")
 internal class PrototypeNode(
 	val attributes: Attributes,
-	val name: String,
-	val type: Type.Function,
-	val parameterNames: List<String>
+	override val prototype: Prototype
 ) : FunctionGenerator, ASTNode {
 	val noMangle: Boolean
 	val extern: Boolean
-
-	inline val mangledName: String
-		get() = type.makeName(name)
 
 	val functionName: String
 
@@ -36,13 +32,13 @@ internal class PrototypeNode(
 		var extern = false
 		for (attr in attributes)
 			when (attr) {
-				Attribute.NO_MANGLE -> functionName = name
+				Attribute.NO_MANGLE -> functionName = prototype.name
 				Attribute.EXTERN -> extern = true
 				else -> attr.notApplicableTo("Prototype")
 			}
 		this.extern = extern
 		if (functionName == null) {
-			this.functionName = mangledName
+			this.functionName = prototype.mangledName
 			noMangle = false
 		} else {
 			this.functionName = functionName
@@ -51,10 +47,10 @@ internal class PrototypeNode(
 	}
 
 	fun Context.resolveForThis() =
-		PrototypeNode(attributes, name, type.resolve(true) as Type.Function, parameterNames)
+		PrototypeNode(attributes, prototype.resolve())
 
 	fun rename(newName: String) =
-		PrototypeNode(attributes, newName, type, parameterNames)
+		PrototypeNode(attributes, prototype.rename(newName))
 
 	override fun Context.generateForThis(newName: String?): Function {
 		val renamed =
@@ -63,34 +59,34 @@ internal class PrototypeNode(
 		return Function.Static(renamed.codegen())
 	}
 
-	override val prototype: PrototypeNode
-		get() = this
-
 	override fun Context.codegenForThis(): Value {
-		val type = type.resolve() as Type.Function
+		val type = prototype.type.resolve() as Type.Function
 		lookupValueOrNull(functionName)?.let { return it }
 		val function = LLVM.LLVMAddFunction(module, functionName, type.llvm)
 		val offset = type.hasReceiver.toInt()
 		if (type.hasReceiver) LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, 0), "this", "this".length.toLong())
-		parameterNames.forEachIndexed { index, name ->
+		prototype.parameterNames.forEachIndexed { index, name ->
 			LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, index + offset), name, name.length.toLong())
 		}
-		return type.new(function).also { declareFunction(this@PrototypeNode, Function.Static(it)) }
+		return type.new(function).also { declareFunction(prototype, Function.Static(it)) }
 	}
 
 	override fun toString(): String =
-		buildString(attributes, name, type, parameterNames)
+		buildString(attributes, prototype.name, prototype.type, prototype.parameterNames)
 
 	override fun equals(other: Any?): Boolean =
-		other is PrototypeNode && name == other.name && type == other.type
+		other is PrototypeNode && prototype == other.prototype
 }
 
 internal class GenericPrototypeNode(
-	override val prototype: PrototypeNode,
+	val node: PrototypeNode,
 	val typeParameters: List<TypeParameter>
 ) : FunctionGenerator, ASTNode {
+	override val prototype: Prototype
+		get() = node.prototype
+
 	override fun Context.generateForThis(newName: String?): Function =
-		Function.Generic.obtain(this, prototype, typeParameters)
+		Function.Generic.obtain(this, node, typeParameters)
 
 	override fun Context.codegenForThis(): Value {
 		declareFunction(prototype, generate())
@@ -99,7 +95,7 @@ internal class GenericPrototypeNode(
 
 	override fun toString(): String =
 		buildString(
-			prototype.attributes,
+			node.attributes,
 			genericName(prototype.name, typeParameters),
 			prototype.type,
 			prototype.parameterNames

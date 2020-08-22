@@ -24,9 +24,11 @@ internal class KametTest {
 		val context = FunctionNode(
 			PrototypeNode(
 				Attributes(setOf(Attribute.NO_MANGLE)),
-				functionName,
-				Type.Function(null, returnType, emptyList()),
-				emptyList()
+				Prototype(
+					functionName,
+					Type.Function(null, returnType, emptyList()),
+					emptyList()
+				)
 			),
 			BlockNode().also {
 				it.elements += ReturnNode(Parser("{$this}").takeBlock())

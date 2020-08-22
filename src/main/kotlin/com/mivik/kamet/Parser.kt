@@ -423,27 +423,27 @@ internal class Parser(private val lexer: Lexer) {
 				takeType()
 			} else Type.Unit
 		val functionType = Type.Function(if (hasReceiver) type else null, returnType, types.readOnly())
-		return PrototypeNode(consumeAttrs(), name, functionType, names.readOnly()).let {
+		return PrototypeNode(consumeAttrs(), Prototype(name, functionType, names.readOnly())).let {
 			if (typeParameters.isEmpty()) it
 			else GenericPrototypeNode(it, typeParameters)
 		}
 	}
 
 	private fun takeFunctionOrPrototype(): FunctionGenerator {
-		val prototype = takePrototype()
+		val node = takePrototype()
 		return if (peek() is Token.LeftBrace) {
 			val block = takeBlock()
-			if (prototype is PrototypeNode)
-				FunctionNode(prototype, block.also {
-					if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.type.returnType))
+			if (node is PrototypeNode)
+				FunctionNode(node, block.also {
+					if (!it.returned) it.elements += ReturnNode(UndefNode(node.prototype.type.returnType))
 				})
 			else {
-				prototype as GenericPrototypeNode
-				GenericFunctionNode(FunctionNode(prototype.prototype, block.also {
-					if (!it.returned) it.elements += ReturnNode(UndefNode(prototype.prototype.type.returnType))
-				}), prototype.typeParameters)
+				node as GenericPrototypeNode
+				GenericFunctionNode(FunctionNode(node.node, block.also {
+					if (!it.returned) it.elements += ReturnNode(UndefNode(node.prototype.type.returnType))
+				}), node.typeParameters)
 			}
-		} else prototype
+		} else node
 	}
 
 	fun takeStruct(): ASTNode {
