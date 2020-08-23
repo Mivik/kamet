@@ -325,11 +325,8 @@ class Context(
 	/**
 	 * @return null if the module passed the verification, and otherwise the error message.
 	 */
-	fun verify(): String? {
-		val error = BytePointer(null as Pointer?)
-		val ret = LLVM.LLVMVerifyModule(module, LLVM.LLVMReturnStatusAction, error)
-		return if (ret == 1) error.toJava()
-		else null
+	fun verify(): String? = captureError {
+		LLVM.LLVMVerifyModule(module, LLVM.LLVMReturnStatusAction, it)
 	}
 
 	override fun dispose() {

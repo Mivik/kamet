@@ -126,3 +126,9 @@ internal fun <T : Pointer> buildPointerPointer(vararg pointers: T) =
 internal fun List<Type>.unexpected() {
 	if (isNotEmpty()) error("Unexpected type arguments: <${joinToString()}>")
 }
+
+internal inline fun captureError(nativeCall: (BytePointer) -> Int): String? {
+	val error = BytePointer()
+	return if (nativeCall(error) == 1) error.toJava()
+	else null
+}
