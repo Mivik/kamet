@@ -6,8 +6,13 @@ import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.llvm.LLVM.LLVMTargetRef
 import org.bytedeco.llvm.global.LLVM
 import java.io.File
+import kotlin.system.exitProcess
 
 enum class OutputFormat(val defaultSuffix: String) {
+	EXECUTABLE(
+		if (System.getProperties().getProperty("os.name").contains("Windows", true)) ".exe"
+		else ".out"
+	),
 	IR(".ll"), BITCODE(".bc"), OBJECT(".o"), ASSEMBLY(".asm")
 }
 
@@ -15,7 +20,7 @@ class KametArguments(parser: ArgParser) {
 	val outputFormat by parser.storing(
 		"-f", "--format",
 		help = "Output format of the compiling result"
-	) { OutputFormat.valueOf(toUpperCase()) }.default(OutputFormat.OBJECT)
+	) { OutputFormat.valueOf(toUpperCase()) }.default(OutputFormat.EXECUTABLE)
 
 	val targetTriple by parser.storing(
 		"-t", "--target",
@@ -30,14 +35,14 @@ class KametArguments(parser: ArgParser) {
 	}
 
 	val optimizationLevel by parser.storing(
-		"-o", "--opt-level",
+		"-O", "--opt-level",
 		help = "Optimization level"
 	) { toInt() }.default(0).addValidator {
 		if (value < 0 || value > 3) error("Illegal optimization level: $value")
 	}
 
-	val outputPath by parser.positional(
-		"OUTPUT",
+	val outputFile by parser.storing(
+		"-o", "--output",
 		help = "Compiling output path"
 	) { File(this) }.default { File("a" + outputFormat.defaultSuffix) }.addValidator {
 		if (value.exists() && !value.isFile) error("Compiling output path \"$value\" already exist and is not a file")
@@ -81,7 +86,7 @@ fun main(args: Array<String>): Unit = ArgParser(args).parseInto(::KametArguments
 				LLVM.LLVMTargetMachineEmitToFile(
 					machine,
 					module,
-					BytePointer(outputPath.absolutePath),
+					BytePointer(outputFile.path),
 					if (outputFormat == OutputFormat.ASSEMBLY) LLVM.LLVMAssemblyFile
 					else LLVM.LLVMObjectFile,
 					it
@@ -90,9 +95,24 @@ fun main(args: Array<String>): Unit = ArgParser(args).parseInto(::KametArguments
 		}
 		OutputFormat.IR ->
 			captureError {
-				LLVM.LLVMPrintModuleToFile(module, outputPath.absolutePath, it)
+				LLVM.LLVMPrintModuleToFile(module, outputFile.path, it)
 			}?.let { error("Failed to compile: $it") }
 		OutputFormat.BITCODE ->
-			LLVM.LLVMWriteBitcodeToFile(module, outputPath.absolutePath)
+			LLVM.LLVMWriteBitcodeToFile(module, outputFile.path)
+		OutputFormat.EXECUTABLE -> {
+			val objectFile = File.createTempFile("kamet", ".o")
+			captureError {
+				LLVM.LLVMTargetMachineEmitToFile(
+					machine,
+					module,
+					BytePointer(objectFile.path),
+					LLVM.LLVMObjectFile,
+					it
+				)
+			}?.let { error("Failed to compile: $it") }
+			val process = Runtime.getRuntime().exec(arrayOf("gcc", objectFile.path, "-o", outputFile.path))
+			process.errorStream.copyTo(System.err)
+			exitProcess(process.waitFor())
+		}
 	}
 }
