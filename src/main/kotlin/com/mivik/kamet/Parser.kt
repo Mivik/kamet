@@ -115,8 +115,7 @@ internal class Parser(private val lexer: Lexer) {
 		var currentLHS = lhs
 		while (true) {
 			val current = peek()
-			if (current == UnaryOp.Increment || current == UnaryOp.Decrement) {
-				currentLHS ?: error("Expected expression before postfix operator: $current")
+			if (currentLHS != null && (current == UnaryOp.Increment || current == UnaryOp.Decrement)) {
 				take()
 				return UnaryOpNode(
 					current as UnaryOp,
