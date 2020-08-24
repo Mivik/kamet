@@ -430,8 +430,15 @@ internal class Parser(private val lexer: Lexer) {
 
 	private fun takeFunctionOrPrototype(): FunctionGenerator {
 		val node = takePrototype()
-		return if (peek() is Token.LeftBrace) {
-			val block = takeBlock()
+		return if (peek() == Token.LeftBrace || peek() == BinOp.Assign) {
+			val block =
+				if (peek() == Token.LeftBrace) takeBlock()
+				else {
+					take()
+					BlockNode().also {
+						it.elements += ReturnNode(takeExpr())
+					}
+				}
 			if (node is PrototypeNode)
 				FunctionNode(node, block.also {
 					if (!it.returned) it.elements += ReturnNode(UndefNode(node.prototype.type.returnType))

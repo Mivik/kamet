@@ -61,11 +61,11 @@ internal class KametTest {
 	fun `unsigned values`() {
 		assertEquals(
 			1001,
-			"1U+2*500".evaluate(Type.Primitive.Integral.UInt).int
+			"1U + 2 * 500".evaluate(Type.Primitive.Integral.UInt).int
 		)
 		assertEquals(
 			3L,
-			"1+2UL".evaluate(Type.Primitive.Integral.ULong).long
+			"1 + 2UL".evaluate(Type.Primitive.Integral.ULong).long
 		)
 		assertEquals(
 			Type.Primitive.Integral.ULong,
@@ -87,16 +87,16 @@ internal class KametTest {
 	fun fibonacci() {
 		"""
 			#[no_mangle] fun fib(x: Int): Int {
-				if (x<=2) return 1
+				if (x <= 2) return 1
 				var a = 1
 				var b = 1
 				var c = 2
-				var x = x-2
+				var x = x - 2
 				while (x!=0) {
 					c = a+b
 					a = b
 					b = c
-					x = x-1
+					x = x - 1
 				}
 				return c
 			}
@@ -131,7 +131,7 @@ internal class KametTest {
 				*third = 2333
 				let forth: *Int = x+3
 				*forth = 1234
-				x[0]+x[1]+x[2]+x[3]
+				x[0] + x[1] + x[2] + x[3]
 			""".trimIndent().evaluate(Type.Primitive.Integral.Int).int
 		)
 		assertEquals(
@@ -148,7 +148,7 @@ internal class KametTest {
 					intPointer[0] = 123
 					let doublePointer: *Double = test.b
 					doublePointer[1] = 233.5
-					return test.a[0]+test.b[1]
+					return test.a[0] + test.b[1]
 				}
 			""".trimIndent().runFunction("test").double.toInt()
 		)
@@ -313,9 +313,9 @@ internal class KametTest {
 		assertEquals(
 			25,
 			"""
-				fun Int.sqr(): Int { return this*this }
+				fun Int.sqr(): Int = this * this
 				
-				#[no_mangle] fun test(): Int { return 5.sqr() }
+				#[no_mangle] fun test(): Int = 5.sqr()
 			""".trimIndent().runFunction("test").int
 		)
 		assertEquals(
@@ -326,7 +326,7 @@ internal class KametTest {
 					b: Int
 				}
 				
-				fun &Test.sum(): Int { return a+b }
+				fun &Test.sum(): Int = a + b
 				
 				#[no_mangle] fun test(): Int {
 					var test: Test
@@ -343,7 +343,7 @@ internal class KametTest {
 		assertEquals(
 			4,
 			"""
-				fun <T> max(a: T, b: T): T { return if (a>b) a else b }
+				fun <T> max(a: T, b: T): T = if (a > b) a else b
 				
 				#[no_mangle] fun test(): Int {
 					return max<Int>(max<Int>(1, 3), max<Int>(2, 4))
@@ -352,7 +352,7 @@ internal class KametTest {
 		)
 		assertTrue(
 			"""
-				fun <T> T.lessThan(other: T): Boolean { return this<other }
+				fun <T> T.lessThan(other: T): Boolean = this < other
 				
 				#[no_mangle] fun test(): Boolean {
 					return 1.lessThan<Int>(2) && (2.3).lessThan<Double>(4.5)
@@ -364,7 +364,7 @@ internal class KametTest {
 	@Test
 	fun `generic inference`() {
 		"""
-			fun <T> max(a: T, b: T): T { return if (a>b) a else b }
+			fun <T> max(a: T, b: T): T = if (a > b) a else b
 			
 			fun test() {
 				let int = max(max(1, 3), max(2, 4))
@@ -373,7 +373,7 @@ internal class KametTest {
 		""".trimIndent().tryCompile()
 		assertFails {
 			"""
-				fun <T> max(a: T, b: T): T { return if (a>b) a else b }
+				fun <T> max(a: T, b: T): T = if (a > b) a else b
 				
 				fun test() {
 					max(max(1, 2), max(2.3, 3.5))
@@ -397,18 +397,18 @@ internal class KametTest {
 				}
 				
 				impl Polygon for Square {
-					fun &const This.side_count(): Int { return 4 } 
+					fun &const This.side_count(): Int = 4 
 				}
 				
 				impl Polygon for Arbitrary {
-					fun &const This.side_count(): Int { return count }
+					fun &const This.side_count(): Int = count
 				}
 				
 				#[no_mangle] fun test(): Int {
 					val square: Square
 					var arbitrary: Arbitrary
 					arbitrary.count = 5
-					return square.side_count()+arbitrary.side_count()
+					return square.side_count() + arbitrary.side_count()
 				}
 			""".trimIndent().runFunction("test").int
 		)
@@ -419,19 +419,19 @@ internal class KametTest {
 					fun &const This.value(): Int
 				
 					fun &const This.inc(): Int {
-						return value()+1
+						return value() + 1
 					}
 				}
 				
 				struct One {}
 				
 				impl Number for One {
-					fun &const This.value(): Int { return 1 }
+					fun &const This.value(): Int = 1
 				}
 				
 				#[no_mangle] fun test(): Int {
 					val one: One
-					return one.value()+one.inc()
+					return one.value() + one.inc()
 				}
 			""".trimIndent().runFunction("test").int
 		)
