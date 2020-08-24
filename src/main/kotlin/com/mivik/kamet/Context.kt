@@ -3,8 +3,6 @@ package com.mivik.kamet
 import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.PrototypeNode
-import org.bytedeco.javacpp.BytePointer
-import org.bytedeco.javacpp.Pointer
 import org.bytedeco.llvm.LLVM.LLVMBasicBlockRef
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
 import org.bytedeco.llvm.LLVM.LLVMModuleRef

@@ -14,4 +14,6 @@ internal class NewNode(val type: Type) : ASTNode {
 				it.pointer()
 			)
 		}
+
+	override fun toString(): String = "new $type"
 }

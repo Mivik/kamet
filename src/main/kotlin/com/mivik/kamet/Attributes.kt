@@ -15,7 +15,7 @@ enum class Attribute {
 
 class Attributes(val set: Set<Attribute> = emptySet()) : Set<Attribute> by set {
 	override fun toString(): String =
-		set.isNotEmpty().ifThat { "#[${set.joinToString(" ") { it.name.toUpperCase() }}]" }
+		set.isNotEmpty().ifThat { "#[${set.joinToString(" ") { it.name.toLowerCase() }}] " }
 }
 
 class AttributesBuilder {

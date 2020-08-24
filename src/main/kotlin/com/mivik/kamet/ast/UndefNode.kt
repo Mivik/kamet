@@ -7,5 +7,5 @@ import com.mivik.kamet.Value
 internal class UndefNode(val type: Type) : ASTNode {
 	override fun Context.codegenForThis(): Value = type.resolve().undefined()
 
-	override fun toString(): String = "undefined($type)"
+	override fun toString(): String = "undef($type)"
 }
