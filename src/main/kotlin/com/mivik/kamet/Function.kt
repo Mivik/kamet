@@ -69,6 +69,9 @@ sealed class Function : Resolvable {
 	}
 
 	class Dynamic(val index: Int, override val type: Type.Function) : Function() {
+		override fun Context.resolveForThis(): Function =
+			Dynamic(index, type.resolve(resolveTypeParameter = true) as Type.Function)
+
 		@Suppress("NAME_SHADOWING")
 		override fun Context.invokeForThis(receiver: Value?, arguments: List<Value>, typeArguments: List<Type>): Value {
 			val receiver = receiver?.implicitCastOrNull(type.receiverType!!)

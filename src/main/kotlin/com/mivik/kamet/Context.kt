@@ -120,7 +120,6 @@ class Context(
 
 	fun declareTrait(name: String, trait: Trait) {
 		if (traitMap.containsKey(name)) error("Redeclaration of trait ${name.escape()}")
-		require(trait.resolved) { "Declaring an unresolved trait: $trait" }
 		traitMap[name] = trait
 	}
 
@@ -205,7 +204,6 @@ class Context(
 		invokeForThis(receiver, arguments, typeArguments)
 
 	internal inline fun TypeParameter.check(type: Type) = checkForThis(type)
-	internal inline fun Type.Generic.resolveGeneric(typeArguments: List<Type>) = resolveGenericForThis(typeArguments)
 
 	internal fun Function.instantiate(
 		receiverType: Type?,
@@ -298,6 +296,8 @@ class Context(
 		typeArguments: List<Type>,
 		block: Context.() -> R
 	): R {
+		@Suppress("NAME_SHADOWING")
+		val typeArguments = typeArguments.map { it.resolve() }
 		val genericName = actualGenericName(name, typeArguments)
 		internalMap[genericName]?.let { return it as R }
 		TypeParameterTable.set(typeParameters, typeArguments)

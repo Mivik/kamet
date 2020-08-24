@@ -12,13 +12,21 @@ import com.mivik.kamet.Value
 import com.mivik.kamet.addIndent
 import com.mivik.kamet.expect
 
-internal class TraitNode(val name: String, val elements: List<FunctionGenerator>) : ASTNode {
+internal class TraitNode(
+	val name: String,
+	val elements: List<FunctionGenerator>,
+	val typeParameters: List<TypeParameter>
+) : ASTNode {
 	override fun Context.codegenForThis(): Value {
 		val implementedFunctions = mutableListOf<Function.Generic>()
 		val abstractFunctions = mutableListOf<Function.Dynamic>()
 		val prototypes = mutableListOf<Prototype>()
-		val trait = Trait.Base(name, implementedFunctions, abstractFunctions, prototypes)
+		val baseTrait = Trait.Base(name, implementedFunctions, abstractFunctions, prototypes)
+		val trait =
+			if (typeParameters.isEmpty()) baseTrait
+			else Trait.Generic(baseTrait, typeParameters)
 		with(subContext(trait = trait)) {
+			for (para in typeParameters) declareType(para.name, Type.TypeParameter(para))
 			for (element in elements) {
 				if (element is PrototypeNode) {
 					prototypes += element.prototype.resolve()
@@ -38,7 +46,7 @@ internal class TraitNode(val name: String, val elements: List<FunctionGenerator>
 					prototype.type.resolve(true) as Type.Function
 				)
 		}
-		declareTrait(trait)
+		declareTrait(name, trait)
 		return Value.Unit
 	}
 

@@ -436,4 +436,30 @@ internal class KametTest {
 			""".trimIndent().runFunction("test").int
 		)
 	}
+
+	@Test
+	fun `generic trait`() {
+		assertEquals(
+			42,
+			"""
+				trait Wrapper<T> {
+					fun &This.unwrap(): T
+				}
+				
+				struct IntWrapper {
+					value: Int
+				}
+				
+				impl Wrapper<Int> for IntWrapper {
+					fun &This.unwrap(): Int = value
+				}
+				
+				#[no_mangle] fun test(): Int {
+					var wrapper: IntWrapper
+					wrapper.value = 42
+					return wrapper.unwrap()
+				}
+			""".trimIndent().runFunction("test").int
+		)
+	}
 }

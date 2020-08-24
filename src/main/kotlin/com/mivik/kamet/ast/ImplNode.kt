@@ -6,8 +6,10 @@ import com.mivik.kamet.Trait
 import com.mivik.kamet.TraitImpl
 import com.mivik.kamet.Type
 import com.mivik.kamet.TypeParameter
+import com.mivik.kamet.TypeParameterTable
 import com.mivik.kamet.Value
 import com.mivik.kamet.addIndent
+import com.mivik.kamet.expect
 
 internal class ImplNode(val trait: Trait, val type: Type, val elements: List<FunctionNode>) : ASTNode {
 	override fun Context.codegenForThis(): Value {

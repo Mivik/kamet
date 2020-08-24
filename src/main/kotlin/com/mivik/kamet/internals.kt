@@ -37,6 +37,12 @@ internal fun String.escape(): String =
 		reversedEscapeMap[c]?.let { sb.append('\\').append(it) } ?: sb.append(c)
 	}.toString()
 
+inline fun <E> MutableList<E>.transform(block: (E) -> E) {
+	val iterator = listIterator()
+	while (iterator.hasNext())
+		iterator.set(block(iterator.next()))
+}
+
 internal fun String.toLongIgnoringOverflow(): Long {
 	var acc = 0L
 	val start = (first() == '-').toInt()

@@ -39,4 +39,7 @@ internal class TypeParameterTable private constructor(private val delegate: Muta
 
 	fun map(typeParameters: List<TypeParameter>): List<Type> =
 		typeParameters.map { this[it] ?: error("Cannot infer type for $it") }
+
+	fun mapOrNull(typeParameters: List<TypeParameter>): List<Type>? =
+		typeParameters.map { this[it] ?: return null }
 }

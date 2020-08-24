@@ -256,36 +256,36 @@ sealed class Type {
 		override fun hashCode(): Int = Objects.hash(elementType, isConst)
 	}
 
-	class Generic(val baseType: Type, val typeParameters: List<com.mivik.kamet.TypeParameter>) : Abstract() {
-		override val name = genericName(baseType.name, typeParameters)
+	class Generic(val base: Type, val typeParameters: List<com.mivik.kamet.TypeParameter>) : Abstract() {
+		override val name = genericName(base.name, typeParameters)
 
 		override fun Context.transformForThis(action: Context.(Type) -> Type?): Type =
-			action(this@Generic) ?: Generic(baseType.transform(action), typeParameters)
+			action(this@Generic) ?: Generic(base.transform(action), typeParameters)
 
-		fun Context.resolveGenericForThis(typeArguments: List<Type>): Type =
-			buildGeneric(baseType.name, typeParameters, typeArguments) {
-				baseType.resolve(resolveTypeParameter = true)
+		fun Context.resolveGeneric(typeArguments: List<Type>): Type =
+			buildGeneric(base.name, typeParameters, typeArguments) {
+				base.resolve(resolveTypeParameter = true)
 			}
 
 		override fun equals(other: Any?): Boolean =
-			typeEquals(other) { baseType == it.baseType && typeParameters == it.typeParameters }
+			typeEquals(other) { base == it.base && typeParameters == it.typeParameters }
 
-		override fun hashCode(): Int = Objects.hash(baseType, typeParameters)
+		override fun hashCode(): Int = Objects.hash(base, typeParameters)
 	}
 
-	class ActualGeneric(val genericType: Type, val typeArguments: List<Type>) : Abstract() {
-		override val name = actualGenericName(genericType.name, typeArguments)
+	class Actual(val generic: Type, val typeArguments: List<Type>) : Abstract() {
+		override val name = actualGenericName(generic.name, typeArguments)
 
 		override fun Context.transformForThis(action: Context.(Type) -> Type?): Type =
-			action(this@ActualGeneric) ?: genericType.transform(action).let {
-				if (it is Generic) it.resolveGeneric(typeArguments)
-				else ActualGeneric(it, typeArguments)
+			action(this@Actual) ?: generic.transform(action).let {
+				if (it is Generic) with(it) { resolveGeneric(typeArguments) }
+				else Actual(it, typeArguments)
 			}
 
 		override fun equals(other: Any?): Boolean =
-			typeEquals(other) { genericType == it.genericType && typeArguments == it.typeArguments }
+			typeEquals(other) { generic == it.generic && typeArguments == it.typeArguments }
 
-		override fun hashCode(): Int = Objects.hash(genericType, typeArguments)
+		override fun hashCode(): Int = Objects.hash(generic, typeArguments)
 	}
 
 	class DynamicReference(val trait: Trait, val type: Type?, isConst: Boolean) :
@@ -323,6 +323,9 @@ sealed class Type {
 	class This(val trait: Trait) : TypeParameter(com.mivik.kamet.TypeParameter.This(trait)) {
 		override val name: String
 			get() = "This[$trait]"
+
+		override fun Context.transformForThis(action: Context.(Type) -> Type?): Type =
+			action(this@This) ?: This(trait.resolve())
 
 		override fun equals(other: Any?): Boolean =
 			typeEquals(other) { trait == it.trait }

@@ -286,8 +286,11 @@ internal class Parser(private val lexer: Lexer) {
 		return Type.Function(receiverType, takeType(), types)
 	}
 
-	fun takeTrait(): Trait =
-		Trait.Named(trimAndTake().expect<Token.Identifier>().name)
+	fun takeTrait(): Trait {
+		val baseTrait = Trait.Named(trimAndTake().expect<Token.Identifier>().name)
+		return if (peek() == BinOp.Less) Trait.Actual(baseTrait, takeTypeArguments())
+		else baseTrait
+	}
 
 	fun takeTypeParameter(): TypeParameter =
 		when (val token = trimAndTake()) {
@@ -369,7 +372,7 @@ internal class Parser(private val lexer: Lexer) {
 			}
 			is Token.Identifier ->
 				Type.Named(token.name).let {
-					if (peek() == BinOp.Less) Type.ActualGeneric(it, takeTypeArguments())
+					if (peek() == BinOp.Less) Type.Actual(it, takeTypeArguments())
 					else it
 				}
 			Token.ThisType -> Type.UnresolvedThis
@@ -470,6 +473,7 @@ internal class Parser(private val lexer: Lexer) {
 	fun takeTraitDecl(): TraitNode {
 		take().expect<Token.Trait>()
 		val name = take().expect<Token.Identifier>().name
+		val typeParameters = takeTypeParameterList()
 		trimAndTake().expect<Token.LeftBrace>()
 		val elements = mutableListOf<FunctionGenerator>()
 		while (true) {
@@ -487,12 +491,12 @@ internal class Parser(private val lexer: Lexer) {
 				break
 			}
 		}
-		return TraitNode(name, elements)
+		return TraitNode(name, elements, typeParameters)
 	}
 
 	fun takeImpl(): ImplNode {
 		take().expect<Token.Impl>()
-		val trait = Trait.Named(take().expect<Token.Identifier>().name)
+		val trait = takeTrait()
 		take().expect<Token.For>()
 		val type = takeType()
 		trimAndTake().expect<Token.LeftBrace>()

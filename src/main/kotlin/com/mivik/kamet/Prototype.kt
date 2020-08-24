@@ -13,4 +13,7 @@ data class Prototype(
 
 	fun rename(newName: String) =
 		Prototype(newName, type, parameterNames)
+
+	override fun toString(): String =
+		"fun ${type.receiverType.ifNotNull { "${type.receiverType}." }}$name(${parameterNames.indices.joinToString { "${parameterNames[it]}: ${type.parameterTypes[it]}" }}): ${type.returnType}"
 }

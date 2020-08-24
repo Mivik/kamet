@@ -72,7 +72,7 @@ internal class PrototypeNode(
 	}
 
 	override fun toString(): String =
-		buildString(attributes, prototype.name, prototype.type, prototype.parameterNames)
+		"$attributes$prototype"
 
 	override fun equals(other: Any?): Boolean =
 		other is PrototypeNode && prototype == other.prototype
@@ -94,10 +94,5 @@ internal class GenericPrototypeNode(
 	}
 
 	override fun toString(): String =
-		buildString(
-			node.attributes,
-			genericName(prototype.name, typeParameters),
-			prototype.type,
-			prototype.parameterNames
-		)
+		node.rename(genericName(prototype.name, typeParameters)).toString()
 }
