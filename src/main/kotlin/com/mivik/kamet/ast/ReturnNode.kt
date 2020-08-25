@@ -5,7 +5,7 @@ import com.mivik.kamet.Type
 import com.mivik.kamet.Value
 import org.bytedeco.llvm.global.LLVM
 
-internal class ReturnNode(val value: ASTNode) : ASTNode {
+internal class ReturnNode(val value: ASTNode) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		val returnType = (currentFunction!!.type as Type.Function).returnType
 		val result = value.codegen().implicitCast(returnType)

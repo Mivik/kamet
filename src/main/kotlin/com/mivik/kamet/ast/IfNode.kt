@@ -5,7 +5,7 @@ import com.mivik.kamet.Value
 import com.mivik.kamet.doInside
 import com.mivik.kamet.ifNotNull
 
-internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBlock: ASTNode? = null) : ASTNode {
+internal class IfNode(val condition: ASTNode, val thenBlock: ASTNode, val elseBlock: ASTNode? = null) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		val conditionValue = condition.codegen()
 		var thenBB = basicBlock("then")

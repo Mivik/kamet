@@ -21,7 +21,7 @@ internal class LetDeclareNode(
 	val name: String,
 	val type: Type? = null,
 	val defaultValue: ASTNode? = null
-) : ASTNode {
+) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		if (defaultValue == null) {
 			type ?: unclearVariable(name)
@@ -44,7 +44,7 @@ internal class VarDeclareNode(
 	val type: Type? = null,
 	val defaultValue: ASTNode? = null,
 	val isConst: Boolean = false
-) : ASTNode {
+) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		if (defaultValue == null) {
 			type ?: unclearVariable(name)

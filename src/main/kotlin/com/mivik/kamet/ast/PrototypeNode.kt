@@ -21,7 +21,7 @@ private fun buildString(attributes: Attributes, name: String, type: Type.Functio
 internal class PrototypeNode(
 	val attributes: Attributes,
 	override val prototype: Prototype
-) : FunctionGenerator, ASTNode {
+) : FunctionGenerator, ASTNode() {
 	val noMangle: Boolean
 	val extern: Boolean
 
@@ -81,7 +81,7 @@ internal class PrototypeNode(
 internal class GenericPrototypeNode(
 	val node: PrototypeNode,
 	val typeParameters: List<TypeParameter>
-) : FunctionGenerator, ASTNode {
+) : FunctionGenerator, ASTNode() {
 	override val prototype: Prototype
 		get() = node.prototype
 

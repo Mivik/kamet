@@ -11,7 +11,7 @@ internal class CallNode(
 	val receiver: ASTNode?,
 	val elements: List<ASTNode>,
 	val typeArguments: List<Type>
-) : ASTNode {
+) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		val receiver = receiver?.codegen()
 		val arguments = elements.map { it.codegen() }

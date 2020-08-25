@@ -7,7 +7,7 @@ import com.mivik.kamet.ValueRef
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.llvm.global.LLVM
 
-internal class PointerSubscriptNode(val pointer: ASTNode, val index: ASTNode) : ASTNode {
+internal class PointerSubscriptNode(val pointer: ASTNode, val index: ASTNode) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		val value = pointer.codegen().let {
 			it.asPointerOrNull() ?: error("Subscripting a non-pointer type: ${it.type}")

@@ -10,6 +10,7 @@ internal sealed class Token {
 
 	object EOF : Token()
 
+	object Whitespace : Token()
 	object Val : Token()
 	object Var : Token()
 	object Let : Token()
@@ -114,7 +115,7 @@ private enum class State : LexerState {
 }
 
 private enum class Action : LexerAction {
-	VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL, FOR, LET,
+	WHITESPACE, VAL, VAR, ENTER_STRING, ESCAPE_CHAR, UNICODE_CHAR, EXIT_STRING, PLAIN_TEXT, CONST, NEWLINE, STRUCT, NULL, AS, SIZEOF, CHAR_LITERAL, FOR, LET,
 	IDENTIFIER, INT_LITERAL, LONG_LITERAL, SINGLE_CHAR_OPERATOR, DOUBLE_CHAR_OPERATOR, DOUBLE_LITERAL, BOOLEAN_LITERAL, NEW, DELETE, THIS_TYPE,
 	UNSIGNED_INT_LITERAL, UNSIGNED_LONG_LITERAL, FUNCTION, RETURN, IF, ELSE, WHILE, DO, SHIFT_LEFT_ASSIGN, SHIFT_RIGHT_ASSIGN, IMPL, TRAIT, THIS
 }
@@ -125,7 +126,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 			options.strict = false
 			options.minimize = true
 			state(default) {
-				"[ \t]+".ignore()
+				"[ \t]+" action Action.WHITESPACE
 				"//[^\r\n]*".ignore()
 				"/\\*([^*]|(\\*+[^*/]))*\\*+/".ignore()
 				"\r|\n|\r\n" action Action.NEWLINE
@@ -179,6 +180,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 
 	override fun onAction(action: Int) {
 		when (Action.values()[action - 1]) {
+			Action.WHITESPACE -> returnValue(Token.Whitespace)
 			Action.VAL -> returnValue(Token.Val)
 			Action.VAR -> returnValue(Token.Var)
 			Action.LET -> returnValue(Token.Let)

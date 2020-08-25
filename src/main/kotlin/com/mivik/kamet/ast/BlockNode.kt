@@ -4,7 +4,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 import com.mivik.kamet.addIndent
 
-internal class BlockNode : ASTNode {
+internal class BlockNode : ASTNode() {
 	val elements: MutableList<ASTNode> = mutableListOf()
 
 	override fun Context.codegenForThis(): Value {

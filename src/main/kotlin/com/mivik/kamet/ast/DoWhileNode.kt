@@ -4,7 +4,7 @@ import com.mivik.kamet.Context
 import com.mivik.kamet.Value
 import com.mivik.kamet.doInsideAndThen
 
-internal class DoWhileNode(val block: ASTNode, val condition: ASTNode) : ASTNode {
+internal class DoWhileNode(val block: ASTNode, val condition: ASTNode) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		val whileBB = basicBlock("while")
 		val finalBB = basicBlock("final")

@@ -37,13 +37,20 @@ internal class Parser(private val lexer: Lexer) {
 	private var lastAttribute: Attributes? = null
 	private var attributeNewlySet = false
 
-	private fun take(): Token =
-		if (readBuffer.isEmpty()) lexer.lex()
-		else readBuffer.pop()
-
-	private fun peek(): Token =
+	@Suppress("NOTHING_TO_INLINE")
+	private inline fun internalPeek(): Token =
 		if (readBuffer.isEmpty()) lexer.lex().also { readBuffer.push(it) }
 		else readBuffer.peek()
+
+	private fun peek(): Token {
+		while (internalPeek() == Token.Whitespace) readBuffer.pop()
+		return readBuffer.peek()
+	}
+
+	private fun take(): Token {
+		while (internalPeek() == Token.Whitespace) readBuffer.pop()
+		return readBuffer.pop()
+	}
 
 	@Suppress("NOTHING_TO_INLINE")
 	private inline fun off(token: Token) {

@@ -59,7 +59,7 @@ import org.bytedeco.llvm.global.LLVM.LLVMUDiv
 import org.bytedeco.llvm.global.LLVM.LLVMURem
 import org.bytedeco.llvm.global.LLVM.LLVMXor
 
-internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : ASTNode {
+internal class BinOpNode(val lhs: ASTNode, val rhs: ASTNode, val op: BinOp) : ASTNode() {
 	private fun unifyOperandTypes(lhsType: Type, rhsType: Type): Type =
 		if (lhsType !is Primitive || rhsType !is Primitive) TODO()
 		else if (lhsType == Primitive.Real.Double || rhsType == Primitive.Real.Double) Primitive.Real.Double

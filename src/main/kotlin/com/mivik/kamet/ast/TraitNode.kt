@@ -16,7 +16,7 @@ internal class TraitNode(
 	val name: String,
 	val elements: List<FunctionGenerator>,
 	val typeParameters: List<TypeParameter>
-) : ASTNode {
+) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		val implementedFunctions = mutableListOf<Function.Generic>()
 		val abstractFunctions = mutableListOf<Function.Dynamic>()

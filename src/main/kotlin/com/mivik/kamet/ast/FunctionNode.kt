@@ -12,7 +12,7 @@ import org.bytedeco.llvm.global.LLVM
 internal class FunctionNode(
 	val node: PrototypeNode,
 	val body: BlockNode
-) : FunctionGenerator, ASTNode {
+) : FunctionGenerator, ASTNode() {
 	override val prototype: Prototype
 		get() = node.prototype
 
@@ -52,7 +52,7 @@ internal class FunctionNode(
 internal class GenericFunctionNode(
 	val node: FunctionNode,
 	val typeParameters: List<TypeParameter>
-) : FunctionGenerator, ASTNode {
+) : FunctionGenerator, ASTNode() {
 	override val prototype: Prototype
 		get() = node.prototype
 

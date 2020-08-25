@@ -10,7 +10,7 @@ import com.mivik.kamet.impossible
 import com.mivik.kamet.reference
 import org.bytedeco.llvm.global.LLVM
 
-internal class ValueNode(val name: String) : ASTNode {
+internal class ValueNode(val name: String) : ASTNode() {
 	private fun fail(): Nothing = error("Unknown identifier ${name.escape()}")
 
 	override fun Context.codegenForThis(): Value =

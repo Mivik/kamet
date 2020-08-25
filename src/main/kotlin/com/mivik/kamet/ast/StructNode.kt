@@ -30,7 +30,7 @@ internal class StructNode(
 	val attributes: Attributes,
 	name: String,
 	elements: List<Pair<String, Type>>
-) : ASTNode {
+) : ASTNode() {
 	val type: Type.Struct = buildStructType(attributes, name, elements)
 
 	override fun Context.codegenForThis(): Value {
@@ -47,7 +47,7 @@ internal class GenericStructNode(
 	name: String,
 	elements: List<Pair<String, Type>>,
 	val typeParameters: List<TypeParameter>
-) : ASTNode {
+) : ASTNode() {
 	private val type = buildStructType(attributes, name, elements)
 
 	override fun Context.codegenForThis(): Value {

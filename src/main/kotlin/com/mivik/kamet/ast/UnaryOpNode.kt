@@ -11,7 +11,7 @@ import com.mivik.kamet.pointer
 import com.mivik.kamet.toLLVM
 import org.bytedeco.llvm.global.LLVM
 
-internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val postfix: Boolean = false) : ASTNode {
+internal class UnaryOpNode(val op: UnaryOp, val value: ASTNode, val postfix: Boolean = false) : ASTNode() {
 	override fun Context.codegenForThis(): Value {
 		var value = value.codegen()
 		when (op) {

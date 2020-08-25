@@ -1,7 +1,7 @@
 plugins {
 	java
 	application
-	kotlin("jvm") version "1.4.0-rc"
+	kotlin("jvm") version "1.4.0"
 }
 
 group = "com.mivik"
@@ -18,7 +18,7 @@ repositories {
 
 dependencies {
 	implementation(kotlin("stdlib-jdk8"))
-	implementation("com.github.KiotLand.kiot-lexer:kiot-lexer:1.0.6.1")
+	implementation("com.github.KiotLand.kiot-lexer:kiot-lexer:1.0.6.2")
 	implementation("org.bytedeco:llvm-platform:10.0.0-1.5.3")
 	implementation("com.xenomachina:kotlin-argparser:2.0.7")
 	testImplementation(kotlin("test-junit"))
