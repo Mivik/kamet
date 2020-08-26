@@ -3,8 +3,10 @@ package com.mivik.kamet
 import com.mivik.kamet.ast.ASTNode
 import com.mivik.kamet.ast.FunctionNode
 import com.mivik.kamet.ast.PrototypeNode
+import org.bytedeco.llvm.LLVM.LLVMAttributeRef
 import org.bytedeco.llvm.LLVM.LLVMBasicBlockRef
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef
+import org.bytedeco.llvm.LLVM.LLVMContextRef
 import org.bytedeco.llvm.LLVM.LLVMModuleRef
 import org.bytedeco.llvm.LLVM.LLVMTypeRef
 import org.bytedeco.llvm.LLVM.LLVMValueRef
@@ -16,6 +18,7 @@ import kotlin.contracts.contract
 @Suppress("NOTHING_TO_INLINE")
 class Context(
 	val parent: Context?,
+	val llvm: LLVMContextRef,
 	val module: LLVMModuleRef,
 	val builder: LLVMBuilderRef,
 	val currentFunction: Value?,
@@ -32,6 +35,7 @@ class Context(
 		fun topLevel(moduleName: String): Context =
 			Context(
 				null,
+				LLVM.LLVMContextCreate(),
 				LLVM.LLVMModuleCreateWithName(moduleName),
 				LLVM.LLVMCreateBuilder(),
 				null, null,
@@ -123,6 +127,11 @@ class Context(
 		traitMap[name] = trait
 	}
 
+	fun obtainAttribute(name: String, value: Long = 0): LLVMAttributeRef {
+		val id = LLVM.LLVMGetEnumAttributeKindForName(name, name.length.toLong())
+		return LLVM.LLVMCreateEnumAttribute(llvm, id, value)
+	}
+
 	fun subContext(
 		function: Value? = currentFunction,
 		trait: Trait? = currentTrait,
@@ -130,6 +139,7 @@ class Context(
 	): Context =
 		Context(
 			this,
+			llvm,
 			module,
 			if (topLevel) LLVM.LLVMCreateBuilder() else builder,
 			function, trait,

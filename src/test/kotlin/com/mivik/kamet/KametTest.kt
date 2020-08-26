@@ -462,4 +462,13 @@ internal class KametTest {
 			""".trimIndent().runFunction("test").int
 		)
 	}
+
+	@Test
+	fun inline() {
+		"""
+			#[inline] fun test(): Int {
+				return 0
+			}
+		""".trimIndent().tryCompile()
+	}
 }

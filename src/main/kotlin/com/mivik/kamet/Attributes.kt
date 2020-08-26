@@ -1,7 +1,7 @@
 package com.mivik.kamet
 
 enum class Attribute {
-	PACKED, NO_MANGLE, EXTERN;
+	PACKED, NO_MANGLE, EXTERN, INLINE;
 
 	companion object {
 		private val attributeMap by lazy { values().associateBy { it.name.toLowerCase() } }
@@ -17,16 +17,3 @@ class Attributes(val set: Set<Attribute> = emptySet()) : Set<Attribute> by set {
 	override fun toString(): String =
 		set.isNotEmpty().ifThat { "#[${set.joinToString(" ") { it.name.toLowerCase() }}] " }
 }
-
-class AttributesBuilder {
-	private val set = mutableSetOf<Attribute>()
-
-	operator fun Attribute.unaryPlus() {
-		set += this
-	}
-
-	fun build() = Attributes(set.readOnly())
-}
-
-inline fun buildAttributes(block: AttributesBuilder.() -> Unit) =
-	AttributesBuilder().apply(block).build()

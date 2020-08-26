@@ -24,19 +24,21 @@ internal class PrototypeNode(
 ) : FunctionGenerator, ASTNode() {
 	val noMangle: Boolean
 	val extern: Boolean
+	val inline: Boolean
 
 	val functionName: String
 
 	init {
 		var functionName: String? = null
 		var extern = false
+		var inline = false
 		for (attr in attributes)
 			when (attr) {
 				Attribute.NO_MANGLE -> functionName = prototype.name
 				Attribute.EXTERN -> extern = true
+				Attribute.INLINE -> inline = true
 				else -> attr.notApplicableTo("Prototype")
 			}
-		this.extern = extern
 		if (functionName == null) {
 			this.functionName = prototype.mangledName
 			noMangle = false
@@ -44,6 +46,8 @@ internal class PrototypeNode(
 			this.functionName = functionName
 			noMangle = true
 		}
+		this.extern = extern
+		this.inline = inline
 	}
 
 	fun Context.resolveForThis() =
@@ -63,6 +67,7 @@ internal class PrototypeNode(
 		val type = prototype.type.resolve() as Type.Function
 		lookupValueOrNull(functionName)?.let { return it }
 		val function = LLVM.LLVMAddFunction(module, functionName, type.llvm)
+		if (inline) LLVM.LLVMAddAttributeAtIndex(function, -1, obtainAttribute("inlinehint"))
 		val offset = type.hasReceiver.toInt()
 		if (type.hasReceiver) LLVM.LLVMSetValueName2(LLVM.LLVMGetParam(function, 0), "this", "this".length.toLong())
 		prototype.parameterNames.forEachIndexed { index, name ->
