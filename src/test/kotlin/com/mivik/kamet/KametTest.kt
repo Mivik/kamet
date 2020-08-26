@@ -122,14 +122,14 @@ internal class KametTest {
 		assertEquals(
 			6310,
 			"""
-				val x: [Int, 5]
+				var x: [Int, 5]
 				let first: &Int = x[0]
 				first = 1926
 				let second: *Int = &x[1]
 				*second = 817
-				let third: *Int = second+1
+				let third: *Int = second + 1
 				*third = 2333
-				let forth: *Int = x+3
+				let forth: *Int = x + 3
 				*forth = 1234
 				x[0] + x[1] + x[2] + x[3]
 			""".trimIndent().evaluate(Type.Primitive.Integral.Int).int
