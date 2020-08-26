@@ -41,6 +41,7 @@ internal sealed class Token {
 	object Impl : Token()
 	object Arrow : Token()
 	object For : Token()
+	object ScopeResolution : Token()
 
 	class DirectType(val type: Type) : Token() {
 		override fun toString(): String = "Type($type)"
@@ -132,7 +133,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 				"\r|\n|\r\n" action Action.NEWLINE
 				"<<=" action Action.SHIFT_LEFT_ASSIGN
 				">>=" action Action.SHIFT_RIGHT_ASSIGN
-				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--|->" action Action.DOUBLE_CHAR_OPERATOR
+				"[+\\-*/&\\|\\^%]=|&&|==|!=|<<|>>|<=|>=|\\|\\||\\+\\+|--|->|::" action Action.DOUBLE_CHAR_OPERATOR
 				"[+\\-*/&\\|\\^<>%\\(\\)\\{\\}:,=~!#\\[\\]\\.]" action Action.SINGLE_CHAR_OPERATOR
 				"'(\\\\u[0-9a-fA-F]{4}|\\\\.|.)'" action Action.CHAR_LITERAL
 				"val" action Action.VAL
@@ -237,6 +238,7 @@ internal class Lexer(chars: CharSequence) : Lexer<Token>(data, chars) {
 					"|=" -> BinOp.BitwiseOrAssign
 					"^=" -> BinOp.XorAssign
 					"->" -> Token.Arrow
+					"::" -> Token.ScopeResolution
 					else -> impossible()
 				}
 			)

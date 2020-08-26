@@ -286,10 +286,10 @@ internal class KametTest {
 			}
 			
 			fun test() {
-				var intPair: Pair<Int, Int>
+				var intPair: Pair::<Int, Int>
 				intPair.first =  1
 				intPair.second = 2
-				var doublePair: Pair<Double, Double>
+				var doublePair: Pair::<Double, Double>
 				doublePair.first = 1.2
 				doublePair.second = 2.3
 			}
@@ -343,10 +343,10 @@ internal class KametTest {
 		assertEquals(
 			4,
 			"""
-				fun <T> max(a: T, b: T): T = if (a > b) a else b
+				fun <T> max(a: T, b: T): T = if (a < b) b else a
 				
 				#[no_mangle] fun test(): Int {
-					return max<Int>(max<Int>(1, 3), max<Int>(2, 4))
+					return max::<Int>(max::<Int>(1, 3), max::<Int>(2, 4))
 				}
 			""".trimIndent().runFunction("test").int
 		)
@@ -355,7 +355,7 @@ internal class KametTest {
 				fun <T> T.lessThan(other: T): Boolean = this < other
 				
 				#[no_mangle] fun test(): Boolean {
-					return 1.lessThan<Int>(2) && (2.3).lessThan<Double>(4.5)
+					return 1.lessThan::<Int>(2) && (2.3).lessThan::<Double>(4.5)
 				}
 			""".trimIndent().runFunction("test").boolean
 		)

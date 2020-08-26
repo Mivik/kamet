@@ -167,8 +167,8 @@ internal class Parser(private val lexer: Lexer) {
 			Token.This -> ValueNode("this")
 			is Token.Identifier ->
 				when (peek()) {
-					Token.LeftParenthesis, BinOp.Less -> {
-						val typeArguments = takeTypeArguments()
+					Token.LeftParenthesis, Token.ScopeResolution -> {
+						val typeArguments = takeTypeArguments(true)
 						CallNode(Function.Named(token.name), null, takeArguments(), typeArguments)
 					}
 					else -> ValueNode(token.name)
@@ -295,7 +295,7 @@ internal class Parser(private val lexer: Lexer) {
 
 	fun takeTrait(): Trait {
 		val baseTrait = Trait.Named(trimAndTake().expect<Token.Identifier>().name)
-		return if (peek() == BinOp.Less) Trait.Actual(baseTrait, takeTypeArguments())
+		return if (peek() == BinOp.Less) Trait.Actual(baseTrait, takeTypeArguments(false))
 		else baseTrait
 	}
 
@@ -313,8 +313,15 @@ internal class Parser(private val lexer: Lexer) {
 			else -> unexpected(token)
 		}
 
-	fun takeTypeArguments(): List<Type> {
-		if (peek() != BinOp.Less) return emptyList()
+	fun takeTypeArguments(needScope: Boolean): List<Type> {
+		if (needScope) {
+			if (peek() != Token.ScopeResolution) return emptyList()
+			take()
+			if (peek() != BinOp.Less) {
+				off(Token.ScopeResolution)
+				return emptyList()
+			}
+		} else if (peek() != BinOp.Less) return emptyList()
 		take()
 		val list = mutableListOf<Type>()
 		takeList(BinOp.Greater) {
@@ -379,8 +386,9 @@ internal class Parser(private val lexer: Lexer) {
 			}
 			is Token.Identifier ->
 				Type.Named(token.name).let {
-					if (peek() == BinOp.Less) Type.Actual(it, takeTypeArguments())
-					else it
+					val arguments = takeTypeArguments(true)
+					if (arguments.isEmpty()) it
+					else Type.Actual(it, arguments)
 				}
 			Token.ThisType -> Type.UnresolvedThis
 			else -> unexpected(token)
