@@ -15,7 +15,9 @@ enum class AttributeType {
 
 @Suppress("NOTHING_TO_INLINE")
 data class Attribute(val type: AttributeType, val arguments: List<String>? = null) {
-	constructor(name: String, arguments: List<String>? = null) : this(AttributeType.lookup(name) ?: error("Unknown attribute type: $name"), arguments)
+	constructor(name: String, arguments: List<String>? = null) : this(
+		AttributeType.lookup(name) ?: error("Unknown attribute type: $name"), arguments
+	)
 
 	fun expectNoArguments() = apply {
 		require(arguments.isNullOrEmpty()) { "Attribute $type does not have parameter" }

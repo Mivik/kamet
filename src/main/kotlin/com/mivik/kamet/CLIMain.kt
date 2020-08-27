@@ -11,7 +11,6 @@ import org.bytedeco.llvm.LLVM.LLVMModuleRef
 import org.bytedeco.llvm.LLVM.LLVMTargetMachineRef
 import org.bytedeco.llvm.LLVM.LLVMTargetRef
 import org.bytedeco.llvm.global.LLVM
-import org.kiot.util.binarySize
 import java.io.File
 import kotlin.system.exitProcess
 import kotlin.time.Duration

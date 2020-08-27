@@ -350,7 +350,13 @@ internal inline fun <T> Type.Primitive.Integral.foldSign(signed: T, unsigned: T)
 @Suppress("NOTHING_TO_INLINE")
 inline fun Type.reference(isConst: Boolean = false) =
 	if (this is Type.Dynamic) Type.DynamicReference(trait, type, isConst)
-	else Type.Reference(if (this is Type.Array && isConst!=this.isConst) Type.Array(elementType, size, isConst) else this, isConst)
+	else Type.Reference(
+		if (this is Type.Array && isConst != this.isConst) Type.Array(
+			elementType,
+			size,
+			isConst
+		) else this, isConst
+	)
 
 @Suppress("NOTHING_TO_INLINE")
 inline fun Type.pointer(isConst: Boolean = false) = Type.Pointer(this, isConst)

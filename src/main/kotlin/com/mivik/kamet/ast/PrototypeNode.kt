@@ -9,7 +9,6 @@ import com.mivik.kamet.Prototype
 import com.mivik.kamet.Type
 import com.mivik.kamet.TypeParameter
 import com.mivik.kamet.Value
-import com.mivik.kamet.expect
 import com.mivik.kamet.genericName
 import com.mivik.kamet.ifNotNull
 import com.mivik.kamet.toInt

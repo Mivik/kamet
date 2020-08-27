@@ -1,6 +1,5 @@
 package com.mivik.kamet.ast
 
-import com.mivik.kamet.Attribute
 import com.mivik.kamet.AttributeType
 import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
