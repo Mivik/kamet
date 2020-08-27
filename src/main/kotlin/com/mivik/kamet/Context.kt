@@ -105,6 +105,12 @@ class Context(
 			name
 		)
 
+	fun Value.asPointerOrNull(): Value? =
+		if (type is Type.Reference && type.originalType is Type.Array) {
+			val type = type.originalType.elementType.pointer(type.isConst)
+			type.new(llvm.bitCast(type.llvm))
+		} else type.asPointerOrNull()?.let { Value(llvm, it) }
+
 	fun declare(name: String, value: Value) {
 		valueMap[name] = value
 	}
@@ -322,6 +328,7 @@ class Context(
 		LLVM.LLVMAddReassociatePass(pass)
 		LLVM.LLVMAddGVNPass(pass)
 		LLVM.LLVMAddCFGSimplificationPass(pass)
+		LLVM.LLVMAddFunctionInliningPass(pass)
 		LLVM.LLVMRunPassManager(pass, module)
 		LLVM.LLVMDisposePassManager(pass)
 	}

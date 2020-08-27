@@ -12,6 +12,7 @@ open class Value(val llvm: LLVMValueRef, val type: Type) {
 
 	internal open fun Context.dereferenceForThis(): Value = this@Value
 
-	fun asPointerOrNull(): Value? =
-		type.asPointerOrNull()?.let { Value(llvm, it) }
+	fun dump() {
+		LLVM.LLVMDumpValue(llvm)
+	}
 }

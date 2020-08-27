@@ -215,35 +215,39 @@ internal class Parser(private val lexer: Lexer) {
 			else -> takeStmt()
 		}
 
+	fun takeLet(): LetDeclareNode {
+		take().expect<Token.Let>()
+		val name = take().expect<Token.Identifier>().name
+		var type: Type? = null
+		if (peek() == Token.Colon) {
+			take()
+			type = takeType()
+		}
+		return if (peek() == BinOp.Assign) {
+			take()
+			LetDeclareNode(name, type, takeExpr())
+		} else LetDeclareNode(name, null, UndefNode(type!!))
+	}
+
+	fun takeVar(isGlobal: Boolean = false): VarDeclareNode {
+		val isConst = take() == Token.Val
+		val name = take().expect<Token.Identifier>().name
+		var type: Type? = null
+		if (peek() == Token.Colon) {
+			take()
+			type = takeType()
+		}
+		return if (peek() == BinOp.Assign) {
+			take()
+			VarDeclareNode(name, type, takeExpr(), isConst, isGlobal)
+		} else VarDeclareNode(name, null, UndefNode(type!!), isConst, isGlobal)
+	}
+
 	fun takeStmt(): ASTNode =
 		when (trimAndPeek()) {
 			Token.Struct -> takeStruct()
-			Token.Let -> {
-				take()
-				val name = take().expect<Token.Identifier>().name
-				var type: Type? = null
-				if (peek() == Token.Colon) {
-					take()
-					type = takeType()
-				}
-				if (peek() == BinOp.Assign) {
-					take()
-					LetDeclareNode(name, type, takeExpr())
-				} else LetDeclareNode(name, null, UndefNode(type!!))
-			}
-			Token.Val, Token.Var -> {
-				val isConst = take() == Token.Val
-				val name = take().expect<Token.Identifier>().name
-				var type: Type? = null
-				if (peek() == Token.Colon) {
-					take()
-					type = takeType()
-				}
-				if (peek() == BinOp.Assign) {
-					take()
-					VarDeclareNode(name, type, takeExpr(), isConst)
-				} else VarDeclareNode(name, null, UndefNode(type!!), isConst)
-			}
+			Token.Let -> takeLet()
+			Token.Val, Token.Var -> takeVar()
 			Token.Return -> {
 				take()
 				if (peek() == Token.Newline) ReturnNode(Value.Unit.direct())
@@ -543,6 +547,8 @@ internal class Parser(private val lexer: Lexer) {
 				Token.Trait -> list += takeTraitDecl()
 				Token.Impl -> list += takeImpl()
 				Token.NumberSign -> takeAttributes()
+				Token.Let -> list += takeLet()
+				Token.Val, Token.Var -> list += takeVar(true)
 				Token.EOF -> return TopLevelNode(list.readOnly())
 				else -> TODO()
 			}

@@ -483,4 +483,22 @@ internal class KametTest {
 			#[inline] fun c(): Int {}
 		""".trimIndent().tryCompile()
 	}
+
+	@Test
+	fun `global variable`() {
+		assertEquals(
+			7,
+			"""
+				let PI = 3.1415926535
+				var x: [Int, 5]
+				var y: Int = 3
+				
+				#[no_mangle] fun test(): Int {
+					++y
+					x[0] = 3
+					return x[0] + y
+				}
+			""".trimIndent().runFunction("test").int
+		)
+	}
 }

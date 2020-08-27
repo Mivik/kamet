@@ -355,7 +355,8 @@ inline fun Type.reference(isConst: Boolean = false) =
 			elementType,
 			size,
 			isConst
-		) else this, isConst
+		) else this,
+		isConst
 	)
 
 @Suppress("NOTHING_TO_INLINE")

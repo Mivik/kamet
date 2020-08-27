@@ -10,7 +10,6 @@ data class TraitImpl(val trait: Trait, val type: Type, val functions: List<Funct
 		val arrayType = Type.Array(voidPointer, functions.size, true)
 		val rawTable = LLVM.LLVMAddGlobal(module, arrayType.llvm, "table of impl $trait for $type")
 		val thisType = Type.Dynamic(trait, type).reference()
-//		val thisType = type.reference()
 		LLVM.LLVMSetInitializer(
 			rawTable,
 			LLVM.LLVMConstArray(
