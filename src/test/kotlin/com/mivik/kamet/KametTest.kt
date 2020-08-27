@@ -134,6 +134,18 @@ internal class KametTest {
 				x[0] + x[1] + x[2] + x[3]
 			""".trimIndent().evaluate(Type.Primitive.Integral.Int).int
 		)
+		assertFails {
+			"""
+				val x: [Int, 5]
+				let first: &Int = x[0]
+			""".trimIndent().tryCompile()
+		}
+		assertFails {
+			"""
+				val x: [Int, 5]
+				x[0] = 2
+			""".trimIndent().tryCompile()
+		}
 		assertEquals(
 			356,
 			"""
