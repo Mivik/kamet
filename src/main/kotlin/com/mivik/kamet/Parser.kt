@@ -97,7 +97,16 @@ internal class Parser(private val lexer: Lexer) {
 			val attrs = mutableSetOf<Attribute>()
 			while (true) {
 				val name = take().expect<Token.Identifier>().name
-				attrs += Attribute.lookup(name) ?: error("Unknown attribute ${name.escape()}")
+				val list =
+					if (peek() == Token.LeftParenthesis)
+						mutableListOf<String>().also {
+							take()
+							while (peek() != Token.RightParenthesis)
+								it += take().expect<Token.Identifier>().name
+							take()
+						}
+					else null
+				attrs += Attribute(name, list)
 				if (peek() == Token.RightBracket) break
 			}
 			take()

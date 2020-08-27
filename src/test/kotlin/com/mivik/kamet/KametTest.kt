@@ -23,7 +23,7 @@ internal class KametTest {
 		val functionName = "eval"
 		val context = FunctionNode(
 			PrototypeNode(
-				Attributes(setOf(Attribute.NO_MANGLE)),
+				Attributes(setOf(Attribute(AttributeType.NO_MANGLE))),
 				Prototype(
 					functionName,
 					Type.Function(null, returnType, emptyList()),
@@ -466,9 +466,9 @@ internal class KametTest {
 	@Test
 	fun inline() {
 		"""
-			#[inline] fun test(): Int {
-				return 0
-			}
+			#[inline(always)] fun a(): Int {}
+			#[inline(never)] fun b(): Int {}
+			#[inline] fun c(): Int {}
 		""".trimIndent().tryCompile()
 	}
 }

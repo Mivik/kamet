@@ -1,6 +1,7 @@
 package com.mivik.kamet.ast
 
 import com.mivik.kamet.Attribute
+import com.mivik.kamet.AttributeType
 import com.mivik.kamet.Attributes
 import com.mivik.kamet.Context
 import com.mivik.kamet.Type
@@ -12,9 +13,12 @@ import com.mivik.kamet.ifThat
 private fun buildStructType(attributes: Attributes, name: String, elements: List<Pair<String, Type>>): Type.Struct {
 	var packed = false
 	for (attr in attributes)
-		when (attr) {
-			Attribute.PACKED -> packed = true
-			else -> attr.notApplicableTo("Struct")
+		when (attr.type) {
+			AttributeType.PACKED -> {
+				attr.expectNoArguments()
+				packed = true
+			}
+			else -> attr.type.notApplicableTo("Struct")
 		}
 	return Type.Struct(name, elements, packed)
 }
