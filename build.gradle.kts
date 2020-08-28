@@ -81,7 +81,11 @@ abstract class PlatformDistTask : DefaultTask() {
 			splitLine(File(binDir, "${project.name}.bat").readText(), "set CLASSPATH=", "bat")
 
 		val libFiles = (libDir.listFiles() ?: error("Could not found javacpp libs in distribution"))
-		val platforms = libFiles.mapNotNull { platformOf(it.name) }.toSet().toList()
+		val platforms = libFiles.mapNotNull {
+			// javacpp has distribution for some platforms while llvm hasn't
+			if (it.name.startsWith(llvmPrefix)) platformOf(it.name)
+			else null
+		}.toSet().toList()
 		for (platform in platforms) {
 			println("Distributing for $platform")
 			val outputFile = File(outputDir, "${project.name}-${project.version}-$platform.zip")
