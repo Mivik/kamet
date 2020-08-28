@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.mivik"
-version = "1.0-SNAPSHOT"
+version = "0.1.0"
 
 object Config {
 	const val llvmVersion = "10.0.0"
