@@ -392,6 +392,32 @@ internal class KametTest {
 				}
 			""".trimIndent().tryCompile()
 		}
+		"""
+			struct Box<T> {
+				value: T
+			}
+
+			fun <T> extract(box: &Box::<T>): T = box.value
+
+			#[no_mangle] fun main(): Int {
+				var box: Box::<Int>
+				box.value = 2
+				return extract(box)
+			}
+		""".trimIndent().tryCompile()
+		"""
+			struct Box<T> {
+				value: T
+			}
+
+			fun <T> &Box::<T>.extract(): T = value
+
+			#[no_mangle] fun main(): Int {
+				var box: Box::<Int>
+				box.value = 2
+				return box.extract()
+			}
+		""".trimIndent().tryCompile()
 	}
 
 	@Test

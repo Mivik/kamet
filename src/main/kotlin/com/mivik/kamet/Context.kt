@@ -122,14 +122,12 @@ class Context(
 	inline fun declareType(type: Type) = declareType(type.name, type)
 
 	fun declareType(name: String, type: Type) {
-		if (typeMap.containsKey(name)) error("Redeclaration of type ${name.escape()}")
 		typeMap[name] = type
 	}
 
 	fun declareTrait(trait: Trait) = declareTrait(trait.name, trait)
 
 	fun declareTrait(name: String, trait: Trait) {
-		if (traitMap.containsKey(name)) error("Redeclaration of trait ${name.escape()}")
 		traitMap[name] = trait
 	}
 
