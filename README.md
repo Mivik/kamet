@@ -1,1 +1,1 @@
-[kamet | 基于 LLVM 的编程语言的实现](https://mivik.gitee.io/2020/08/29/kamet-basic-implementation/)
+[kamet | 基于 LLVM 的编程语言的实现](https://mivik.gitee.io/2020/tech/kamet-basic-implementation/)
